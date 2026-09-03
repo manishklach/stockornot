@@ -61,6 +61,8 @@ export function MarketChart({
 
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     fetch(`/api/market/${symbol}?range=${range}`, { signal: controller.signal })
       .then(async (response) => {
         const payload = (await response.json()) as MarketData & {
@@ -70,21 +72,29 @@ export function MarketChart({
           throw new Error(payload.error || 'Market data is unavailable.');
         return payload;
       })
-      .then(setData)
+      .then((payload) => {
+        if (active) setData(payload);
+      })
       .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === 'AbortError')
-          return;
+        if (!active) return;
         setData(null);
         setError(
-          reason instanceof Error
-            ? reason.message
-            : 'Market data is unavailable.',
+          reason instanceof DOMException && reason.name === 'AbortError'
+            ? 'The market-data request timed out. Please try again.'
+            : reason instanceof Error
+              ? reason.message
+              : 'Market data is unavailable.',
         );
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        window.clearTimeout(timeout);
+        if (active) setLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [range, retry, symbol]);
 
   const geometry = useMemo(() => {

@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStock, stocks } from '@/lib/stocks';
 
 const COOKIE = 'stockornot_voter';
-let initialization: Promise<unknown> | null = null;
+let databaseReady = false;
 
-function ensureDatabase() {
-  initialization ??= env.DB.batch([
+async function ensureDatabase() {
+  if (databaseReady) return;
+  await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS votes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       voter_key TEXT NOT NULL,
@@ -26,7 +27,7 @@ function ensureDatabase() {
     ),
     env.DB.prepare('PRAGMA optimize'),
   ]);
-  return initialization;
+  databaseReady = true;
 }
 
 function cookieValue(request: NextRequest) {

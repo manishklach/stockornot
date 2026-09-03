@@ -31,10 +31,11 @@ type MarketPayload = {
 };
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
-let initialization: Promise<unknown> | null = null;
+let cacheReady = false;
 
-function ensureCache() {
-  initialization ??= env.DB.batch([
+async function ensureCache() {
+  if (cacheReady) return;
+  await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS market_cache (
       symbol TEXT NOT NULL,
       range TEXT NOT NULL CHECK (range IN ('5d','ytd','1y')),
@@ -47,7 +48,7 @@ function ensureCache() {
     ),
     env.DB.prepare('PRAGMA optimize'),
   ]);
-  return initialization;
+  cacheReady = true;
 }
 
 function isoDate(date: Date) {
