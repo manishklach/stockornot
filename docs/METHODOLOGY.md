@@ -36,7 +36,9 @@ These controls discourage casual duplicate voting. They are not proof of personh
 
 ## Market data
 
-Prices, changes, volume, ranges, and chart shapes in version 0.1.0 are illustrative delayed sample data. They must not be treated as current quotations. A production integration should use a properly licensed feed, show timestamps, document adjustment rules, and define fallback behavior for halted or unavailable instruments.
+Version 0.2.0 uses Massive adjusted daily aggregate bars for 5D, YTD, and 1Y charts. The displayed percentage compares the first and last adjusted close in the selected view; the high and low use the aggregate bars in that same period. Responses are cached for 15 minutes, show their latest trading date, and may be delayed. They must not be treated as real-time quotations. If the provider is temporarily unavailable, the server may return the last cached payload and label it cached.
+
+The instrument catalog and sector labels remain curated application content. Provider availability, market holidays, corporate-action adjustments, and a user's subscription entitlements can affect the returned history. Production use must comply with the provider's licensing and redistribution terms.
 
 ## Interpretation
 
@@ -50,4 +52,3 @@ Hotness represents audience sentiment in this product. It does not measure:
 - Regulatory or accounting quality
 
 StockOrNot is an entertainment and discovery experience, not investment research or advice.
-

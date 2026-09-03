@@ -4,7 +4,7 @@
 
 **A fast, playful sentiment layer for US stocks and ETFs.** Vote **Hot**, **Not**, or **Skip**, then reveal what the crowd thinks.
 
-[Open the live MVP](https://stockornot.abc123xyza.chatgpt.site)
+[Open the database-backed MVP](https://stockornot.abc123xyza.chatgpt.site)
 
 ## Why StockOrNot?
 
@@ -20,9 +20,10 @@ The product separates that sentiment signal from investment analysis. Scores are
 - One current vote per device, ticker, and day with server-side validation
 - Hottest, coldest, and most-divisive leaderboards
 - Stock and ETF filters, ticker search, and keyboard shortcuts
-- Shareable ticker detail pages with sentiment and sample trend history
+- Shareable ticker detail pages with accurate 5D, YTD, and 1Y adjusted price history
 - Responsive, accessible interface with reduced-motion support
-- Clear sample-data labeling, methodology, and financial disclaimers
+- Server-side Massive market-data integration with a 15-minute D1 cache
+- Clear delayed-data labeling, methodology, and financial disclaimers
 - Branded Open Graph and X/Twitter preview metadata
 
 ## Product loop
@@ -41,6 +42,7 @@ The crowd score is intentionally hidden before a vote. After voting, the user se
 - shadcn UI primitives and Base UI
 - Cloudflare Workers runtime
 - Cloudflare D1 with Drizzle schema and migrations
+- Massive adjusted daily aggregate market data
 - OpenAI Sites for hosting
 
 ## Run locally
@@ -49,10 +51,11 @@ Requirements: Node.js 22.13 or newer and npm.
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. The local Sites runtime provisions the D1 binding used by the vote API.
+Add your Massive API key to `.env.local`, then open `http://localhost:3000`. The key stays on the server and must never be committed. The local Sites runtime provisions the D1 binding used by the APIs.
 
 Useful commands:
 
@@ -67,7 +70,7 @@ See [Development](docs/DEVELOPMENT.md) for the complete contributor workflow.
 
 ## Data and scoring
 
-The MVP ships with a small curated instrument catalog and illustrative delayed sample figures. These values are intentionally not represented as live quotes. New crowd votes are stored persistently and combined with seeded vote totals so the initial product experience has meaningful rankings.
+The MVP ships with a small curated instrument catalog. Adjusted daily price bars are requested server-side from Massive for 5D, YTD, and 1Y views, timestamped in the interface, and cached in D1 for 15 minutes. They may be delayed and are not represented as real-time quotes. New crowd votes are stored persistently and combined with seeded vote totals so the initial product experience has meaningful rankings.
 
 For ticker `t`:
 
@@ -79,7 +82,7 @@ See [Methodology](docs/METHODOLOGY.md) for score semantics, abuse controls, and 
 
 ## Architecture
 
-The client renders the voting flow and requests aggregate scores from a small API route. The route validates the instrument and rating, identifies an anonymous browser using an HTTP-only cookie, enforces daily vote uniqueness, writes to D1, and returns refreshed aggregates.
+The client renders the voting flow and requests aggregate scores and chart data from server routes. Voting is validated and persisted in D1. Market requests keep the provider credential server-side and cache normalized results in D1.
 
 See [Architecture](docs/ARCHITECTURE.md) for the system boundaries, data model, and request flow.
 
@@ -99,5 +102,4 @@ StockOrNot is for entertainment and informational discovery only. Nothing in the
 
 ## Project status
 
-Version **0.1.0** is the complete MVP foundation. The next product milestone is a production-grade data and identity layer: licensed market data, rolling sentiment windows, stronger abuse defenses, watchlists, and notification loops.
-
+Version **0.2.0** adds provider-backed adjusted price history. The next product milestone is a broader data and identity layer: symbol synchronization, rolling sentiment windows, stronger abuse defenses, watchlists, and notification loops. Confirm production redistribution rights with the data provider before a public launch.

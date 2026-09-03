@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowDownRight,
   ArrowRight,
-  ArrowUpRight,
   BarChart3,
   Flame,
   Info,
@@ -25,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Stock, score as baseScore, stocks } from '@/lib/stocks';
+import { MarketChart } from '@/components/market-chart';
 
 type Scores = Record<
   string,
@@ -33,41 +32,6 @@ type Scores = Record<
 type Vote = 'hot' | 'not';
 type Filter = 'All' | 'Stocks' | 'ETFs';
 type Board = 'hot' | 'cold' | 'divisive';
-
-function Sparkline({
-  stock,
-  compact = false,
-}: {
-  stock: Stock;
-  compact?: boolean;
-}) {
-  const min = Math.min(...stock.history);
-  const max = Math.max(...stock.history);
-  const points = stock.history
-    .map((value, index) => {
-      const x = (index / (stock.history.length - 1)) * 660;
-      const y = 166 - ((value - min) / Math.max(max - min, 1)) * 135;
-      return `${x},${y}`;
-    })
-    .join(' ');
-  const positive = stock.history.at(-1)! >= stock.history[0];
-  return (
-    <svg
-      viewBox="0 0 660 180"
-      className={compact ? 'h-10 w-24' : 'relative z-10 h-full w-full'}
-      aria-label={`${stock.symbol} five day ${positive ? 'upward' : 'downward'} sample trend`}
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={positive ? 'var(--primary)' : 'var(--destructive)'}
-        strokeWidth={compact ? 11 : 5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function Mark({ stock, small = false }: { stock: Stock; small?: boolean }) {
   return (
@@ -193,8 +157,6 @@ export function StockApp() {
   const matches = stocks.filter((stock) =>
     `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase()),
   );
-  const positive = current.change >= 0;
-
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-white/8 bg-background/90 backdrop-blur-xl">
@@ -307,58 +269,29 @@ export function StockApp() {
                     </span>
                   </span>
                 </Link>
-                <div className="shrink-0 text-right">
-                  <p className="font-mono text-lg font-bold sm:text-xl">
-                    ${current.price.toFixed(2)}
-                  </p>
-                  <p
-                    className={`flex items-center justify-end gap-1 text-sm font-bold ${positive ? 'text-primary' : 'text-destructive'}`}
-                  >
-                    {positive ? (
-                      <ArrowUpRight className="size-4" />
-                    ) : (
-                      <ArrowDownRight className="size-4" />
-                    )}
-                    {Math.abs(current.change).toFixed(2)}%
-                  </p>
-                </div>
+                <span className="shrink-0 rounded-full border border-primary/25 bg-primary/7 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-primary">
+                  Market data
+                </span>
               </div>
 
               <div className="grid gap-8 p-5 sm:p-8 md:grid-cols-[1fr_220px]">
-                <div>
-                  <div className="mb-4 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>5 day sample movement</span>
-                    <span>Delayed demo data</span>
-                  </div>
-                  <div className="relative h-52 overflow-hidden rounded-2xl bg-[#0a1519] p-5">
-                    <div className="chart-grid absolute inset-0" />
-                    <Sparkline stock={current} />
-                    <span
-                      className={`absolute bottom-4 left-5 font-mono text-xs font-bold ${positive ? 'text-primary' : 'text-destructive'}`}
-                    >
-                      {positive ? '+' : '−'}
-                      {Math.abs(current.change * 2.1).toFixed(2)}% / 5D
-                    </span>
-                  </div>
-                </div>
+                <MarketChart key={current.symbol} symbol={current.symbol} />
                 <dl className="grid grid-cols-2 gap-x-5 gap-y-5 self-center md:grid-cols-1">
                   <div>
                     <dt>Sector</dt>
                     <dd>{current.sector}</dd>
                   </div>
                   <div>
-                    <dt>
-                      {current.type === 'ETF' ? 'Fund size' : 'Market cap'}
-                    </dt>
-                    <dd>{current.marketCap}</dd>
+                    <dt>Asset type</dt>
+                    <dd>{current.type}</dd>
                   </div>
                   <div>
-                    <dt>Sample volume</dt>
-                    <dd>{current.volume}</dd>
+                    <dt>Venue</dt>
+                    <dd>US market</dd>
                   </div>
                   <div>
-                    <dt>52-week range</dt>
-                    <dd>{current.range}</dd>
+                    <dt>Price source</dt>
+                    <dd>Massive</dd>
                   </div>
                 </dl>
               </div>

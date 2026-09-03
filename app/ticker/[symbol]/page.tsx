@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft, CircleAlert, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getStock, score, stocks } from '@/lib/stocks';
+import { MarketChart } from '@/components/market-chart';
 
 type Props = { params: Promise<{ symbol: string }> };
 
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: { images: [] },
       twitter: { images: [] },
     };
-  const description = `${stock.symbol} is ${score(stock)}% hot on StockOrNot. See the crowd sentiment and sample trend.`;
+  const description = `${stock.symbol} is ${score(stock)}% hot on StockOrNot. See crowd sentiment and adjusted market history.`;
   return {
     title: `${stock.symbol} sentiment · StockOrNot`,
     description,
@@ -53,14 +54,6 @@ export default async function TickerPage({ params }: Props) {
       </main>
     );
   const sentiment = score(stock);
-  const min = Math.min(...stock.history);
-  const max = Math.max(...stock.history);
-  const points = stock.history
-    .map(
-      (value, index) =>
-        `${(index / (stock.history.length - 1)) * 900},${220 - ((value - min) / Math.max(max - min, 1)) * 175}`,
-    )
-    .join(' ');
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -83,7 +76,7 @@ export default async function TickerPage({ params }: Props) {
         </div>
       </header>
       <div className="mx-auto max-w-5xl px-5 py-10">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
             <span
               style={{ backgroundColor: stock.color }}
@@ -103,67 +96,29 @@ export default async function TickerPage({ params }: Props) {
               <p className="text-muted-foreground">{stock.name}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="font-mono text-2xl font-bold">
-              ${stock.price.toFixed(2)}
-            </p>
-            <p
-              className={
-                stock.change >= 0 ? 'text-primary' : 'text-destructive'
-              }
-            >
-              {stock.change >= 0 ? '+' : ''}
-              {stock.change.toFixed(2)}% sample
-            </p>
-          </div>
+          <span className="rounded-full border border-primary/25 bg-primary/7 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-primary">
+            Adjusted market data
+          </span>
         </div>
         <div className="grid gap-5 md:grid-cols-[1fr_310px]">
           <section className="rounded-[26px] border border-white/10 bg-card p-6 sm:p-8">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[.15em] text-muted-foreground">
-                  Sample price movement
-                </p>
-                <h2 className="mt-1 text-xl font-black">Five-day shape</h2>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                Delayed demo data
-              </span>
-            </div>
-            <div className="chart-grid h-72 rounded-2xl bg-[#0a1519] p-5">
-              <svg
-                viewBox="0 0 900 240"
-                className="h-full w-full"
-                aria-label={`${stock.symbol} five-day sample movement`}
-              >
-                <polyline
-                  points={points}
-                  fill="none"
-                  stroke={
-                    stock.change >= 0 ? 'var(--primary)' : 'var(--destructive)'
-                  }
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            <MarketChart symbol={stock.symbol} large />
             <dl className="mt-7 grid grid-cols-2 gap-6 sm:grid-cols-4">
               <div>
                 <dt>Sector</dt>
                 <dd>{stock.sector}</dd>
               </div>
               <div>
-                <dt>{stock.type === 'ETF' ? 'Fund size' : 'Market cap'}</dt>
-                <dd>{stock.marketCap}</dd>
+                <dt>Asset type</dt>
+                <dd>{stock.type}</dd>
               </div>
               <div>
-                <dt>Sample volume</dt>
-                <dd>{stock.volume}</dd>
+                <dt>Venue</dt>
+                <dd>US market</dd>
               </div>
               <div>
-                <dt>52-week range</dt>
-                <dd>{stock.range}</dd>
+                <dt>Price source</dt>
+                <dd>Massive</dd>
               </div>
             </dl>
           </section>
@@ -209,8 +164,8 @@ export default async function TickerPage({ params }: Props) {
           <p>
             StockOrNot scores show how this community voted today. They do not
             evaluate valuation, risk, suitability, or future returns. Price
-            figures on this MVP are illustrative sample data and are not live
-            market quotes.
+            history shown here uses adjusted daily aggregate bars from Massive
+            and may be delayed. Always verify prices with your broker.
           </p>
         </section>
       </div>

@@ -1,9 +1,9 @@
 # Product roadmap
 
-## Phase 1 — Production data foundation
+## Phase 1 — Expand the data foundation
 
-- Integrate a licensed US equities and ETF market-data provider
-- Replace fixtures with timestamped quotes and adjusted history
+- Confirm production licensing and redistribution rights for market data
+- Add intraday quotes where plan entitlements and product needs support them
 - Establish canonical security identifiers and delisting behavior
 - Add scheduled symbol and metadata synchronization
 - Separate seeded launch data from organic crowd sentiment
@@ -35,4 +35,3 @@
 ## Deliberately out of scope
 
 StockOrNot should not execute trades, custody assets, provide personalized recommendations, promise returns, or sell ranking placement. Those additions would materially change the product and its compliance profile.
-

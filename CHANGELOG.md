@@ -2,6 +2,25 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.2.0] — 2026-09-03
+
+### Added
+
+- Provider-backed adjusted daily market history from Massive
+- Interactive 5D, YTD, and 1Y chart ranges
+- Latest close, period return, high/low range, volume, and market date
+- Server-only provider authentication and a 15-minute D1 market-data cache
+- Stale-cache fallback when the upstream provider is temporarily unavailable
+
+### Changed
+
+- Removed illustrative price and chart fixtures from the instrument catalog
+- Updated methodology, architecture, development, and roadmap documentation
+
+### Notes
+
+Market bars may be delayed and are not real-time quotations. Production launch remains subject to the provider's licensing and redistribution terms.
+
 ## [0.1.0] — 2026-09-03
 
 ### Added
@@ -21,4 +40,3 @@ All notable changes to StockOrNot are documented here.
 ### Notes
 
 Market figures in this MVP are illustrative delayed sample data. Version 0.1.0 establishes the product and platform foundation; licensed live market data is planned for the next milestone.
-

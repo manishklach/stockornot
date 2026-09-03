@@ -90,11 +90,11 @@ export default function MethodologyPage() {
         <section className="mt-10">
           <h2 className="text-2xl font-black">Data in this MVP</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-            Ticker facts and prices are illustrative delayed sample data so the
-            experience can be tested safely before a licensed market-data feed
-            is connected. Crowd votes are stored persistently. Leaderboards
-            combine a seeded baseline with new community votes, giving the MVP
-            useful results from day one.
+            Charts use adjusted daily aggregate bars from Massive for 5D, YTD,
+            and 1Y views. Results are cached for 15 minutes, timestamped, and
+            may be delayed; they are not real-time quotes. Crowd votes are
+            stored persistently. Leaderboards combine a seeded baseline with new
+            community votes, giving the MVP useful results from day one.
           </p>
         </section>
         <section className="mt-10 rounded-2xl border border-primary/25 bg-primary/5 p-6">
