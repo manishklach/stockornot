@@ -34,11 +34,9 @@ The MVP uses:
 
 These controls discourage casual duplicate voting. They are not proof of personhood and do not stop determined attackers who rotate devices, cookies, or networks.
 
-## Market data
+## Instrument data
 
-Version 0.2.0 uses Massive adjusted daily aggregate bars for 5D, YTD, and 1Y charts. The displayed percentage compares the first and last adjusted close in the selected view; the high and low use the aggregate bars in that same period. Responses are cached for 15 minutes, show their latest trading date, and may be delayed. They must not be treated as real-time quotations. If the provider is temporarily unavailable, the server may return the last cached payload and label it cached.
-
-The instrument catalog and sector labels remain curated application content. Provider availability, market holidays, corporate-action adjustments, and a user's subscription entitlements can affect the returned history. Production use must comply with the provider's licensing and redistribution terms.
+The MVP intentionally omits market charts and quotes from the rating surface. Ticker symbols, full company or fund names, asset types, and sector labels are curated application content. This keeps the experience focused on crowd sentiment and prevents that sentiment from being confused with price analysis.
 
 ## Interpretation
 

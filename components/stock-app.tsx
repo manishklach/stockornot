@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Stock, score as baseScore, stocks } from '@/lib/stocks';
-import { MarketChart } from '@/components/market-chart';
 
 type Scores = Record<
   string,
@@ -33,11 +32,19 @@ type Vote = 'hot' | 'not';
 type Filter = 'All' | 'Stocks' | 'ETFs';
 type Board = 'hot' | 'cold' | 'divisive';
 
-function Mark({ stock, small = false }: { stock: Stock; small?: boolean }) {
+function Mark({
+  stock,
+  small = false,
+  large = false,
+}: {
+  stock: Stock;
+  small?: boolean;
+  large?: boolean;
+}) {
   return (
     <span
       style={{ backgroundColor: stock.color }}
-      className={`grid shrink-0 place-items-center font-black text-[#071014] ${small ? 'size-10 rounded-xl text-[11px]' : 'size-14 rounded-2xl text-lg'}`}
+      className={`grid shrink-0 place-items-center font-black text-[#071014] ${small ? 'size-10 rounded-xl text-[11px]' : large ? 'size-20 rounded-[22px] text-2xl sm:size-24 sm:rounded-[26px] sm:text-3xl' : 'size-14 rounded-2xl text-lg'}`}
     >
       {stock.symbol.slice(0, 2)}
     </span>
@@ -247,51 +254,26 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
               key={current.symbol}
               className="stock-enter overflow-hidden rounded-[28px] border border-white/10 bg-card shadow-[0_30px_100px_rgba(0,0,0,.28)]"
             >
-              <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-5 sm:px-8">
+              <div className="flex min-h-[280px] items-center justify-center px-6 py-12 sm:min-h-[330px] sm:px-10 sm:py-16">
                 <Link
                   href={`/ticker/${current.symbol.toLowerCase()}`}
-                  className="group flex min-w-0 items-center gap-4"
+                  className="group flex min-w-0 flex-col items-center gap-5 text-center sm:flex-row sm:gap-7 sm:text-left"
                 >
-                  <Mark stock={current} />
+                  <Mark stock={current} large />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-2">
-                      <strong className="text-2xl font-black tracking-tight group-hover:text-primary">
+                    <span className="flex items-center justify-center gap-3 sm:justify-start">
+                      <strong className="text-5xl font-black tracking-[-.06em] transition group-hover:text-primary sm:text-6xl">
                         {current.symbol}
                       </strong>
                       <span className="rounded-md bg-white/7 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         {current.type}
                       </span>
                     </span>
-                    <span className="block truncate text-sm text-muted-foreground">
+                    <span className="mt-2 block text-base text-muted-foreground sm:text-lg">
                       {current.name}
                     </span>
                   </span>
                 </Link>
-                <span className="shrink-0 rounded-full border border-primary/25 bg-primary/7 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-primary">
-                  Market data
-                </span>
-              </div>
-
-              <div className="grid gap-8 p-5 sm:p-8 md:grid-cols-[1fr_220px]">
-                <MarketChart key={current.symbol} symbol={current.symbol} />
-                <dl className="grid grid-cols-2 gap-x-5 gap-y-5 self-center md:grid-cols-1">
-                  <div>
-                    <dt>Sector</dt>
-                    <dd>{current.sector}</dd>
-                  </div>
-                  <div>
-                    <dt>Asset type</dt>
-                    <dd>{current.type}</dd>
-                  </div>
-                  <div>
-                    <dt>Venue</dt>
-                    <dd>US market</dd>
-                  </div>
-                  <div>
-                    <dt>Price source</dt>
-                    <dd>Massive</dd>
-                  </div>
-                </dl>
               </div>
 
               <div className="border-t border-white/8 bg-black/10 p-5 sm:px-8">
@@ -494,9 +476,8 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
         <footer className="mt-12 flex flex-col justify-between gap-4 border-t border-white/8 py-8 text-xs text-muted-foreground sm:flex-row">
           <p>© 2026 StockOrNot · Built for curiosity, not certainty.</p>
           <p className="max-w-xl sm:text-right">
-            Sample delayed data. Sentiment is entertainment and discovery—not
-            investment advice, a recommendation, or an offer to buy or sell
-            securities.
+            Sentiment is entertainment and discovery—not investment advice, a
+            recommendation, or an offer to buy or sell securities.
           </p>
         </footer>
       </div>

@@ -2,6 +2,18 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.2.1] — 2026-09-03
+
+### Changed
+
+- Simplified the primary rating card to ticker, full company or fund name, and asset type
+- Removed market charts, quotes, and provider metadata from the visible MVP
+- Refocused ticker detail pages on security identity and crowd sentiment
+
+### Notes
+
+The market-data integration remains available for future product exploration, but the active MVP no longer requests it from the browser.
+
 ## [0.2.0] — 2026-09-03
 
 ### Added

@@ -10,11 +10,10 @@
 
 ```bash
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-Set `MASSIVE_API_KEY` in `.env.local`. The app is served at `http://localhost:3000`. Local D1 state and `.env.local` should not be committed.
+The app is served at `http://localhost:3000`. Local D1 state and `.env.local` should not be committed.
 
 ## Project map
 
@@ -27,7 +26,6 @@ app/
   layout.tsx               Site-wide metadata and fonts
   page.tsx                 Main entry point
 components/
-  market-chart.tsx         Provider-backed 5D, YTD, and 1Y chart
   stock-app.tsx            Core client experience
   ui/                      Reusable shadcn UI primitives
 db/
@@ -70,14 +68,13 @@ Manually exercise:
 4. Switch Stocks and ETFs filters.
 5. Test hottest, coldest, and divisive rankings.
 6. Search for a ticker and open its detail page.
-7. Switch the chart among 5D, YTD, and 1Y and confirm the latest date and prices load.
-8. Open the methodology page.
-9. Repeat a vote and confirm it updates rather than creating an extra daily vote.
+7. Open the methodology page.
+8. Repeat a vote and confirm it updates rather than creating an extra daily vote.
 
 ## Product conventions
 
 - Keep the primary vote action visible in the first viewport.
 - Reveal community sentiment only after the user votes.
-- Label delayed, cached, or adjusted market figures directly in the interface.
+- Keep market prices and charts out of the core rating surface.
 - Never describe crowd sentiment as investment quality or expected return.
 - Preserve keyboard and touch usability together.

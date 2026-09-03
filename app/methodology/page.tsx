@@ -90,10 +90,9 @@ export default function MethodologyPage() {
         <section className="mt-10">
           <h2 className="text-2xl font-black">Data in this MVP</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-            Charts use adjusted daily aggregate bars from Massive for 5D, YTD,
-            and 1Y views. Results are cached for 15 minutes, timestamped, and
-            may be delayed; they are not real-time quotes. Crowd votes are
-            stored persistently. Leaderboards combine a seeded baseline with new
+            The rating surface intentionally shows only each ticker and company
+            or fund name—no price chart or quote. Crowd votes are stored
+            persistently. Leaderboards combine a seeded baseline with new
             community votes, giving the MVP useful results from day one.
           </p>
         </section>

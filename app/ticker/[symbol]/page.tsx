@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { ArrowLeft, CircleAlert, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getStock, score, stocks } from '@/lib/stocks';
-import { MarketChart } from '@/components/market-chart';
 
 type Props = { params: Promise<{ symbol: string }> };
 
@@ -20,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       openGraph: { images: [] },
       twitter: { images: [] },
     };
-  const description = `${stock.symbol} is ${score(stock)}% hot on StockOrNot. See crowd sentiment and adjusted market history.`;
+  const description = `${stock.symbol} is ${score(stock)}% hot on StockOrNot. See how the crowd feels about ${stock.name}.`;
   return {
     title: `${stock.symbol} sentiment · StockOrNot`,
     description,
@@ -76,51 +75,25 @@ export default async function TickerPage({ params }: Props) {
         </div>
       </header>
       <div className="mx-auto max-w-5xl px-5 py-10">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
-            <span
-              style={{ backgroundColor: stock.color }}
-              className="grid size-16 place-items-center rounded-2xl text-xl font-black text-[#071014]"
-            >
-              {stock.symbol.slice(0, 2)}
-            </span>
+        <div className="grid gap-5 md:grid-cols-[1fr_310px]">
+          <section className="flex min-h-[390px] items-center justify-center rounded-[26px] border border-white/10 bg-card p-8 text-center">
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-4xl font-black tracking-[-.05em]">
+              <span
+                style={{ backgroundColor: stock.color }}
+                className="mx-auto grid size-24 place-items-center rounded-[26px] text-3xl font-black text-[#071014]"
+              >
+                {stock.symbol.slice(0, 2)}
+              </span>
+              <div className="mt-7 flex items-center justify-center gap-3">
+                <h1 className="text-6xl font-black tracking-[-.06em]">
                   {stock.symbol}
                 </h1>
                 <span className="rounded-md bg-white/7 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   {stock.type}
                 </span>
               </div>
-              <p className="text-muted-foreground">{stock.name}</p>
+              <p className="mt-3 text-lg text-muted-foreground">{stock.name}</p>
             </div>
-          </div>
-          <span className="rounded-full border border-primary/25 bg-primary/7 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.12em] text-primary">
-            Adjusted market data
-          </span>
-        </div>
-        <div className="grid gap-5 md:grid-cols-[1fr_310px]">
-          <section className="rounded-[26px] border border-white/10 bg-card p-6 sm:p-8">
-            <MarketChart symbol={stock.symbol} large />
-            <dl className="mt-7 grid grid-cols-2 gap-6 sm:grid-cols-4">
-              <div>
-                <dt>Sector</dt>
-                <dd>{stock.sector}</dd>
-              </div>
-              <div>
-                <dt>Asset type</dt>
-                <dd>{stock.type}</dd>
-              </div>
-              <div>
-                <dt>Venue</dt>
-                <dd>US market</dd>
-              </div>
-              <div>
-                <dt>Price source</dt>
-                <dd>Massive</dd>
-              </div>
-            </dl>
           </section>
           <aside className="rounded-[26px] border border-white/10 bg-card p-6">
             <p className="text-xs font-bold uppercase tracking-[.15em] text-muted-foreground">
@@ -163,9 +136,8 @@ export default async function TickerPage({ params }: Props) {
           <CircleAlert className="mt-0.5 size-5 shrink-0 text-primary" />
           <p>
             StockOrNot scores show how this community voted today. They do not
-            evaluate valuation, risk, suitability, or future returns. Price
-            history shown here uses adjusted daily aggregate bars from Massive
-            and may be delayed. Always verify prices with your broker.
+            evaluate valuation, risk, suitability, or future returns. Always
+            verify market information with a regulated financial provider.
           </p>
         </section>
       </div>
