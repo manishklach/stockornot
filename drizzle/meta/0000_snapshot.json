@@ -1,0 +1,96 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "bf4a95c8-8863-4fe8-8716-509b0ee943aa",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "votes": {
+      "name": "votes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "voter_key": {
+          "name": "voter_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rating": {
+          "name": "rating",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vote_day": {
+          "name": "vote_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_votes_voter_symbol_day": {
+          "name": "idx_votes_voter_symbol_day",
+          "columns": [
+            "voter_key",
+            "symbol",
+            "vote_day"
+          ],
+          "isUnique": true
+        },
+        "idx_votes_symbol_rating": {
+          "name": "idx_votes_symbol_rating",
+          "columns": [
+            "symbol",
+            "rating"
+          ],
+          "isUnique": false
+        },
+        "idx_votes_voter_created": {
+          "name": "idx_votes_voter_created",
+          "columns": [
+            "voter_key",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
