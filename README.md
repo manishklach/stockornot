@@ -14,7 +14,7 @@ The product separates that sentiment signal from investment analysis. Scores are
 
 ## MVP features
 
-- Rapid **Hot / Not / Skip** voting across a curated universe of US stocks and ETFs
+- Rapid **Hot / Not / Skip** voting across a curated universe of 100 US-listed stocks and ETFs
 - Crowd score revealed only after voting, reducing anchoring and herd behavior
 - Persistent anonymous voting backed by Cloudflare D1
 - One current vote per device, ticker, and day with server-side validation
@@ -68,7 +68,7 @@ See [Development](docs/DEVELOPMENT.md) for the complete contributor workflow.
 
 ## Data and scoring
 
-The MVP ships with a small curated instrument catalog and intentionally omits market charts and quotes. The rating surface focuses on the ticker, full company or fund name, and the user's Hot or Not decision. New crowd votes are stored persistently and combined with seeded vote totals so the initial product experience has meaningful rankings.
+The MVP ships with a curated local catalog of 80 stocks and 20 ETFs and intentionally omits market charts and quotes. The rating surface focuses on the ticker, full company or fund name, and the user's Hot or Not decision. New crowd votes are stored persistently and combined with deterministic seeded vote totals so the initial product experience has meaningful rankings.
 
 For ticker `t`:
 
@@ -100,4 +100,4 @@ StockOrNot is for entertainment and informational discovery only. Nothing in the
 
 ## Project status
 
-Version **0.2.1** sharpens the MVP around its core Hot-or-Not loop by removing market charts from the interface. The next product milestone is rolling sentiment windows, stronger abuse defenses, watchlists, and notification loops.
+Version **0.3.0** expands the local rating universe to 100 symbols while preserving the focused Hot-or-Not loop. The next product milestone is rolling sentiment windows, stronger abuse defenses, watchlists, and notification loops.

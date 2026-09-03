@@ -39,7 +39,9 @@ public/
 
 ## Changing the instrument catalog
 
-Edit `lib/stocks.ts`. Every symbol must be unique and use the `Stock` or `ETF` asset type. Names, classifications, colors, and seeded sentiment totals are curated product content; price history comes from the market API.
+Edit `lib/stocks.ts`. Every symbol must be unique and use the `Stock` or `ETF` asset type. Names, classifications, colors, and seeded sentiment totals are curated product content.
+
+The checked-in MVP catalog contains 100 unique instruments: 80 stocks and 20 ETFs. New entries receive deterministic display colors and seeded sentiment totals, so local and deployed rankings remain stable between builds.
 
 ## Changing the database
 

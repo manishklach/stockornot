@@ -2,6 +2,20 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.3.0] — 2026-09-03
+
+### Added
+
+- Expanded local instrument catalog with 100 unique US-listed symbols
+- Coverage across 80 stocks and 20 broad-market, style, thematic, and sector ETFs
+- Deterministic seeded sentiment totals and colors for stable leaderboard behavior
+
+### Verified
+
+- Hot, cold, and divisive leaderboards rank the complete 100-symbol universe
+- Stock and ETF filters cycle through their respective 80- and 20-symbol sets
+- Search and ticker detail routes support every catalog entry
+
 ## [0.2.1] — 2026-09-03
 
 ### Changed
