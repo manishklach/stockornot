@@ -44,10 +44,15 @@ function Mark({ stock, small = false }: { stock: Stock; small?: boolean }) {
   );
 }
 
-export function StockApp() {
+export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
   const [filter, setFilter] = useState<Filter>('All');
   const [board, setBoard] = useState<Board>('hot');
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => {
+    const requestedIndex = stocks.findIndex(
+      (stock) => stock.symbol === initialSymbol?.toUpperCase(),
+    );
+    return Math.max(requestedIndex, 0);
+  });
   const [selectedVote, setSelectedVote] = useState<Vote | null>(null);
   const [scores, setScores] = useState<Scores>({});
   const [searchOpen, setSearchOpen] = useState(false);
@@ -65,13 +70,6 @@ export function StockApp() {
       .catch(() =>
         setNotice('Live voting is reconnecting. You can still browse.'),
       );
-    const requested = new URLSearchParams(window.location.search)
-      .get('ticker')
-      ?.toUpperCase();
-    const requestedIndex = stocks.findIndex(
-      (stock) => stock.symbol === requested,
-    );
-    if (requestedIndex >= 0) queueMicrotask(() => setIndex(requestedIndex));
   }, []);
 
   const filtered = useMemo(
