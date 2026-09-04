@@ -1,6 +1,15 @@
 import { StockApp } from '@/components/stock-app';
 import { listInstruments } from '@/lib/instruments.server';
 
+function shuffled<T>(items: T[]) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -25,5 +34,5 @@ export default async function Home({
     );
   }
 
-  return <StockApp initialSymbol={ticker} stocks={instruments} />;
+  return <StockApp initialSymbol={ticker} stocks={shuffled(instruments)} />;
 }

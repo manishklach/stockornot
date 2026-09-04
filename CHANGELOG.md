@@ -2,6 +2,13 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.4.1] — 2026-09-04
+
+### Fixed
+
+- Randomized the rating queue on every page load instead of presenting tickers alphabetically
+- Preserved direct ticker selection when entering the rating flow from a ticker detail page
+
 ## [0.4.0] — 2026-09-04
 
 ### Added

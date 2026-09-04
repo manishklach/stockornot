@@ -1,6 +1,6 @@
 {
   "name": "stockornot",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A fast, playful crowd-sentiment app for rating US stocks and ETFs.",
   "homepage": "https://stockornot.abc123xyza.chatgpt.site",
   "repository": {

@@ -100,4 +100,4 @@ StockOrNot is for entertainment and informational discovery only. Nothing in the
 
 ## Project status
 
-Version **0.4.0** moves the complete instrument universe into D1 and makes voting, search, leaderboards, and ticker pages database-backed. The next product milestone is scheduled catalog synchronization, paginated discovery, rolling sentiment windows, and stronger abuse defenses.
+Version **0.4.1** uses the complete D1-backed instrument universe and randomizes the rating queue on every visit. The next product milestone is scheduled catalog synchronization, paginated discovery, rolling sentiment windows, and stronger abuse defenses.
