@@ -32,16 +32,19 @@ db/
   schema.ts                Drizzle schema
 drizzle/                   Generated SQL migrations
 lib/
-  stocks.ts                Typed instrument catalog and seeded totals
+  instruments.server.ts    D1-backed instrument reads and vote totals
+  stocks.ts                Shared instrument types and score calculation
 public/
   og.png                   Social preview image
+scripts/
+  seed-instruments.mjs     Massive reference-data migration generator
 ```
 
 ## Changing the instrument catalog
 
-Edit `lib/stocks.ts`. Every symbol must be unique and use the `Stock` or `ETF` asset type. Names, classifications, colors, and seeded sentiment totals are curated product content.
+The catalog lives in the D1 `instruments` table. The checked-in snapshot contains 10,743 active US instruments: 5,317 common stocks and 5,426 ETFs.
 
-The checked-in MVP catalog contains 100 unique instruments: 80 stocks and 20 ETFs. New entries receive deterministic display colors and seeded sentiment totals, so local and deployed rankings remain stable between builds.
+To refresh it, generate an empty schema migration, then run `node scripts/seed-instruments.mjs drizzle/<migration>.sql`. The script requires `MASSIVE_API_KEY` in ignored `.env.local`, follows provider pagination, imports the `CS` and `ETF` types, and writes deterministic display colors and seeded sentiment totals. Review the generated SQL and counts before committing it. Never commit the API key.
 
 ## Changing the database
 

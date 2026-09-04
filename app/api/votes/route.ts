@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { NextRequest, NextResponse } from 'next/server';
-import { getStock, stocks } from '@/lib/stocks';
+import { getInstrument, listInstruments } from '@/lib/instruments.server';
+import { score } from '@/lib/stocks';
 
 const COOKIE = 'stockornot_voter';
 let databaseReady = false;
@@ -36,28 +37,17 @@ function cookieValue(request: NextRequest) {
 }
 
 async function totals() {
-  const result = await env.DB.prepare(
-    'SELECT symbol, rating, COUNT(*) AS count FROM votes GROUP BY symbol, rating',
-  ).all<{ symbol: string; rating: 'hot' | 'not'; count: number }>();
-  const added: Record<string, { hot: number; not: number }> = {};
-  for (const row of result.results) {
-    added[row.symbol] ??= { hot: 0, not: 0 };
-    added[row.symbol][row.rating] = Number(row.count);
-  }
+  const instruments = await listInstruments();
   return Object.fromEntries(
-    stocks.map((stock) => {
-      const hot = stock.hot + (added[stock.symbol]?.hot ?? 0);
-      const not = stock.not + (added[stock.symbol]?.not ?? 0);
-      return [
-        stock.symbol,
-        {
-          hot,
-          not,
-          score: Math.round((hot / (hot + not)) * 100),
-          total: hot + not,
-        },
-      ];
-    }),
+    instruments.map((stock) => [
+      stock.symbol,
+      {
+        hot: stock.hot,
+        not: stock.not,
+        score: score(stock),
+        total: stock.hot + stock.not,
+      },
+    ]),
   );
 }
 
@@ -85,12 +75,14 @@ export async function POST(request: NextRequest) {
   } | null;
   const symbol = body?.symbol?.toUpperCase();
   const rating = body?.rating;
-  if (!symbol || !getStock(symbol) || (rating !== 'hot' && rating !== 'not')) {
+  const instrument = symbol ? await getInstrument(symbol) : undefined;
+  if (!instrument || (rating !== 'hot' && rating !== 'not')) {
     return NextResponse.json(
       { error: 'Choose a valid ticker and vote.' },
       { status: 400 },
     );
   }
+  const validatedSymbol = instrument.symbol;
 
   const now = Date.now();
   const recent = await env.DB.prepare(
@@ -108,11 +100,22 @@ export async function POST(request: NextRequest) {
   await env.DB.prepare(`INSERT INTO votes (voter_key, symbol, rating, vote_day, created_at)
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(voter_key, symbol, vote_day) DO UPDATE SET rating = excluded.rating, created_at = excluded.created_at`)
-    .bind(voter, symbol, rating, day, now)
+    .bind(voter, validatedSymbol, rating, day, now)
     .run();
 
+  const updated = await getInstrument(validatedSymbol);
+  if (!updated)
+    return NextResponse.json(
+      { error: 'Ticker became unavailable.' },
+      { status: 409 },
+    );
   const response = NextResponse.json({
-    scores: await totals(),
+    score: {
+      hot: updated.hot,
+      not: updated.not,
+      score: score(updated),
+      total: updated.hot + updated.not,
+    },
     accepted: true,
   });
   if (fresh)

@@ -2,10 +2,13 @@
 
 ## Phase 1 — Expand the data foundation
 
+- ✅ Move the active US common-stock and ETF universe into D1
+- ✅ Use the database catalog for voting, validation, search, leaderboards, and ticker pages
 - Confirm production licensing and redistribution rights for market data
 - Add intraday quotes where plan entitlements and product needs support them
 - Establish canonical security identifiers and delisting behavior
 - Add scheduled symbol and metadata synchronization
+- Add server-side catalog pagination and search
 - Separate seeded launch data from organic crowd sentiment
 
 ## Phase 2 — Better sentiment

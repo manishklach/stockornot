@@ -2,17 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, CircleAlert, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getStock, score, stocks } from '@/lib/stocks';
+import { getInstrument } from '@/lib/instruments.server';
+import { score } from '@/lib/stocks';
 
 type Props = { params: Promise<{ symbol: string }> };
 
-export function generateStaticParams() {
-  return stocks.map((stock) => ({ symbol: stock.symbol.toLowerCase() }));
-}
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { symbol } = await params;
-  const stock = getStock(symbol);
+  const stock = await getInstrument(symbol);
   if (!stock)
     return {
       title: 'Ticker not found · StockOrNot',
@@ -39,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TickerPage({ params }: Props) {
   const { symbol } = await params;
-  const stock = getStock(symbol);
+  const stock = await getInstrument(symbol);
   if (!stock)
     return (
       <main className="grid min-h-screen place-items-center p-6">

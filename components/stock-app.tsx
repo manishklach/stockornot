@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Stock, score as baseScore, stocks } from '@/lib/stocks';
+import { Stock, score as baseScore } from '@/lib/stocks';
 
 type Scores = Record<
   string,
@@ -51,7 +51,13 @@ function Mark({
   );
 }
 
-export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
+export function StockApp({
+  initialSymbol,
+  stocks,
+}: {
+  initialSymbol?: string;
+  stocks: Stock[];
+}) {
   const [filter, setFilter] = useState<Filter>('All');
   const [board, setBoard] = useState<Board>('hot');
   const [index, setIndex] = useState(() => {
@@ -66,19 +72,6 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
 
-  useEffect(() => {
-    fetch('/api/votes')
-      .then((response) =>
-        response.ok
-          ? (response.json() as Promise<{ scores: Scores }>)
-          : Promise.reject(),
-      )
-      .then((data) => setScores(data.scores))
-      .catch(() =>
-        setNotice('Live voting is reconnecting. You can still browse.'),
-      );
-  }, []);
-
   const filtered = useMemo(
     () =>
       stocks.filter(
@@ -86,7 +79,7 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
           filter === 'All' ||
           (filter === 'Stocks' ? stock.type === 'Stock' : stock.type === 'ETF'),
       ),
-    [filter],
+    [filter, stocks],
   );
   const current = filtered[index % filtered.length];
   const currentScore = scores[current.symbol] ?? {
@@ -113,12 +106,15 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
           body: JSON.stringify({ symbol: current.symbol, rating }),
         });
         const data = (await response.json()) as {
-          scores: Scores;
+          score: Scores[string];
           error?: string;
         };
         if (!response.ok)
           throw new Error(data.error || 'Vote could not be saved.');
-        setScores(data.scores);
+        setScores((currentScores) => ({
+          ...currentScores,
+          [current.symbol]: data.score,
+        }));
       } catch (error) {
         setNotice(
           error instanceof Error ? error.message : 'Vote could not be saved.',
@@ -156,11 +152,19 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
           return sb - sa;
         })
         .slice(0, 5),
-    [board, scores],
+    [board, scores, stocks],
   );
 
-  const matches = stocks.filter((stock) =>
-    `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase()),
+  const matches = useMemo(
+    () =>
+      stocks
+        .filter((stock) =>
+          `${stock.symbol} ${stock.name}`
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+        )
+        .slice(0, 50),
+    [query, stocks],
   );
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -536,7 +540,7 @@ export function StockApp({ initialSymbol }: { initialSymbol?: string }) {
                 <Sparkles className="mx-auto mb-3 size-5 text-primary" />
                 <p className="font-bold">No ticker found</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  We&apos;re starting with a focused demo universe.
+                  Try another ticker or company name.
                 </p>
               </div>
             )}

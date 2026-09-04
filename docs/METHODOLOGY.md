@@ -36,7 +36,7 @@ These controls discourage casual duplicate voting. They are not proof of personh
 
 ## Instrument data
 
-The MVP intentionally omits market charts and quotes from the rating surface. Ticker symbols, full company or fund names, asset types, and sector labels are curated application content. This keeps the experience focused on crowd sentiment and prevents that sentiment from being confused with price analysis.
+The MVP intentionally omits market charts and quotes from the rating surface. The database snapshot includes active US-locale instruments classified by Massive as common stock (`CS`) or exchange-traded fund (`ETF`); preferred shares, warrants, rights, bonds, ETNs, and other provider types are excluded. Company and fund names and classifications come from provider reference data. This keeps the experience focused on crowd sentiment and prevents that sentiment from being confused with price analysis.
 
 ## Interpretation
 

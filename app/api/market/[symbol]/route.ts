@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { NextRequest, NextResponse } from 'next/server';
-import { getStock } from '@/lib/stocks';
+import { getInstrument } from '@/lib/instruments.server';
 
 type Range = '5d' | 'ytd' | '1y';
 type MassiveBar = {
@@ -98,7 +98,7 @@ export async function GET(
   const { symbol: rawSymbol } = await context.params;
   const symbol = rawSymbol.toUpperCase();
   const range = (request.nextUrl.searchParams.get('range') ?? '5d') as Range;
-  if (!getStock(symbol) || !['5d', 'ytd', '1y'].includes(range)) {
+  if (!(await getInstrument(symbol)) || !['5d', 'ytd', '1y'].includes(range)) {
     return NextResponse.json(
       { error: 'Unknown ticker or range.' },
       { status: 400 },

@@ -14,7 +14,7 @@ The product separates that sentiment signal from investment analysis. Scores are
 
 ## MVP features
 
-- Rapid **Hot / Not / Skip** voting across a curated universe of 100 US-listed stocks and ETFs
+- Rapid **Hot / Not / Skip** voting across a database-backed universe of 10,743 active US stocks and ETFs
 - Crowd score revealed only after voting, reducing anchoring and herd behavior
 - Persistent anonymous voting backed by Cloudflare D1
 - One current vote per device, ticker, and day with server-side validation
@@ -68,7 +68,7 @@ See [Development](docs/DEVELOPMENT.md) for the complete contributor workflow.
 
 ## Data and scoring
 
-The MVP ships with a curated local catalog of 80 stocks and 20 ETFs and intentionally omits market charts and quotes. The rating surface focuses on the ticker, full company or fund name, and the user's Hot or Not decision. New crowd votes are stored persistently and combined with deterministic seeded vote totals so the initial product experience has meaningful rankings.
+The MVP ships with a D1 catalog snapshot of 5,317 common stocks and 5,426 ETFs sourced from Massive's active US ticker reference data. It intentionally omits market charts and quotes: the rating surface focuses on the ticker, full company or fund name, and the user's Hot or Not decision. New crowd votes are stored persistently and combined with deterministic seeded vote totals so the initial product experience has meaningful rankings.
 
 For ticker `t`:
 
@@ -100,4 +100,4 @@ StockOrNot is for entertainment and informational discovery only. Nothing in the
 
 ## Project status
 
-Version **0.3.0** expands the local rating universe to 100 symbols while preserving the focused Hot-or-Not loop. The next product milestone is rolling sentiment windows, stronger abuse defenses, watchlists, and notification loops.
+Version **0.4.0** moves the complete instrument universe into D1 and makes voting, search, leaderboards, and ticker pages database-backed. The next product milestone is scheduled catalog synchronization, paginated discovery, rolling sentiment windows, and stronger abuse defenses.

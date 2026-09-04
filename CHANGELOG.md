@@ -2,6 +2,26 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.4.0] — 2026-09-04
+
+### Added
+
+- D1-backed catalog of 10,743 active US instruments sourced from Massive reference data
+- Coverage for 5,317 common stocks and 5,426 ETFs
+- Repeatable, paginated catalog import script and versioned seed migration
+
+### Changed
+
+- Voting validation, the rating queue, filters, search, leaderboards, and ticker detail pages now read from D1
+- Vote submissions return only the updated ticker score instead of retransmitting the full score map
+- Removed the hardcoded 100-symbol application catalog
+
+### Verified
+
+- Production build and static analysis pass
+- Full score API returns all 10,743 database instruments
+- A database-only ticker detail route resolves and database-only voting succeeds
+
 ## [0.3.0] — 2026-09-03
 
 ### Added

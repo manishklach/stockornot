@@ -41,3 +41,29 @@ export const marketCache = sqliteTable(
     index('idx_market_cache_fetched').on(table.fetchedAt),
   ],
 );
+
+export const instruments = sqliteTable(
+  'instruments',
+  {
+    symbol: text('symbol').primaryKey(),
+    name: text('name').notNull(),
+    assetType: text('asset_type', { enum: ['Stock', 'ETF'] }).notNull(),
+    providerType: text('provider_type').notNull(),
+    primaryExchange: text('primary_exchange'),
+    currency: text('currency'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    color: text('color').notNull(),
+    seedHot: integer('seed_hot').notNull(),
+    seedNot: integer('seed_not').notNull(),
+    sourceUpdatedAt: text('source_updated_at'),
+    syncedAt: integer('synced_at').notNull(),
+  },
+  (table) => [
+    index('idx_instruments_active_type_symbol').on(
+      table.active,
+      table.assetType,
+      table.symbol,
+    ),
+    index('idx_instruments_name').on(table.name),
+  ],
+);
