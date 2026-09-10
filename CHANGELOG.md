@@ -2,6 +2,31 @@
 
 All notable changes to StockOrNot are documented here.
 
+## [0.5.0] - 2026-09-10
+
+### Added
+
+- Per-ticker intelligence dashboard with integrated Hot and Not voting
+- Real company and fund profiles from Massive ticker reference data
+- Ticker-specific news sentiment using Massive insights and reasoning
+- Transparent recency-weighted news scoring on 24-hour, 7-day, and 30-day windows
+- Crowd-versus-news divergence after voting
+- Deduplicated recent-news feed with publisher concentration limits
+- D1-backed profile and news-signal cache with stale-data fallback
+- Database-backed ticker search and a dedicated leaderboard route
+
+### Changed
+
+- The home route now opens a random ticker dashboard instead of a standalone rating card
+- Crowd signals use the same −100 to +100 scale as news sentiment
+- Database schema is owned exclusively by versioned migrations rather than runtime DDL
+
+### Transparency
+
+- A minimum of two scored articles is required for a news score
+- Crowd totals explicitly disclose that they include the launch baseline
+- News sentiment is labeled as coverage tone, not a return forecast
+
 ## [0.4.1] — 2026-09-04
 
 ### Fixed

@@ -1,4 +1,4 @@
-import { ArrowLeft, EyeOff, Gauge, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, EyeOff, Gauge, Newspaper, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
@@ -25,7 +25,7 @@ export default function MethodologyPage() {
             href="/"
             className="flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="size-4" /> Back to voting
+            <ArrowLeft className="size-4" /> Back to dashboard
           </Link>
         </div>
       </header>
@@ -34,14 +34,14 @@ export default function MethodologyPage() {
           Methodology & guardrails
         </p>
         <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-[-.05em] sm:text-5xl">
-          A mood ring for the market.
+          Two signals. One transparent comparison.
         </h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-muted-foreground">
-          StockOrNot is a fast, playful way to see what people feel about US
-          stocks and ETFs. It is designed for discovery—not financial
-          decision-making.
+          StockOrNot keeps recent news tone and community opinion separate,
+          then shows where they agree or diverge. It is designed for
+          discovery—not financial decision-making.
         </p>
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
+        <div className="mt-12 grid gap-4 md:grid-cols-2">
           {[
             [
               EyeOff,
@@ -50,8 +50,13 @@ export default function MethodologyPage() {
             ],
             [
               Gauge,
-              'Simple score',
-              'The score is the percentage of Hot votes out of all Hot and Not votes for a ticker.',
+              'Crowd signal',
+              'Hot and Not responses are normalized to a −100 to +100 scale. The MVP clearly labels that totals include a deterministic launch baseline.',
+            ],
+            [
+              Newspaper,
+              'News signal',
+              'Massive supplies ticker-specific positive, neutral, or negative insights. StockOrNot deduplicates coverage, caps publisher concentration, and weights recent articles more heavily.',
             ],
             [
               ShieldCheck,
@@ -75,6 +80,20 @@ export default function MethodologyPage() {
           })}
         </div>
         <section className="mt-12 border-t border-white/8 pt-10">
+          <h2 className="text-2xl font-black">Signal calculation</h2>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl bg-white/[.035] p-5">
+              <p className="font-mono text-sm text-primary">Crowd = 100 × (Hot − Not) ÷ total</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">A positive value means more Hot responses; a negative value means more Not responses.</p>
+            </div>
+            <div className="rounded-2xl bg-white/[.035] p-5">
+              <p className="font-mono text-sm text-[#83b8ff]">News = 100 × Σ(sentiment × recency weight) ÷ Σ(weight)</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Positive is +1, neutral is 0, and negative is −1. At least two scored articles are required.</p>
+            </div>
+          </div>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">Divergence is Crowd minus News. Headlines with duplicate normalized titles are removed, and no publisher contributes more than four articles to a window.</p>
+        </section>
+        <section className="mt-12 border-t border-white/8 pt-10">
           <h2 className="text-2xl font-black">What the score is not</h2>
           <div className="mt-4 grid gap-3 text-sm leading-6 text-muted-foreground sm:grid-cols-2">
             <p className="rounded-xl bg-white/[.035] p-4">
@@ -88,12 +107,12 @@ export default function MethodologyPage() {
           </div>
         </section>
         <section className="mt-10">
-          <h2 className="text-2xl font-black">Data in this MVP</h2>
+          <h2 className="text-2xl font-black">Data and freshness</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-            The rating surface intentionally shows only each ticker and company
-            or fund name—no price chart or quote. Crowd votes are stored
-            persistently. Leaderboards combine a seeded baseline with new
-            community votes, giving the MVP useful results from day one.
+            Company profiles and ticker-specific news come from Massive. Profiles
+            are cached for seven days and news signals for 30 minutes. If the
+            provider is temporarily unavailable, StockOrNot uses the last cached
+            result when one exists and labels the signal as cached.
           </p>
         </section>
         <section className="mt-10 rounded-2xl border border-primary/25 bg-primary/5 p-6">

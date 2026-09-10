@@ -1,14 +1,32 @@
 # Scoring methodology
 
-## Hotness score
+## Crowd signal
 
 For an instrument with at least one vote:
 
 ```text
-Hotness = Hot votes ÷ (Hot votes + Not votes) × 100
+Crowd = 100 × (Hot votes − Not votes) ÷ (Hot votes + Not votes)
 ```
 
-The displayed result is rounded to the nearest whole percentage. `Skip` advances the experience but is not counted as positive or negative sentiment.
+The result ranges from −100 to +100 and is rounded to the nearest whole number. The crowd signal is hidden until after the visitor votes. Totals currently combine a deterministic launch baseline with live community votes, and the interface labels this explicitly.
+
+## News signal
+
+Massive supplies ticker-specific insight labels and reasoning for eligible articles. Positive maps to +1, neutral to 0, and negative to −1. StockOrNot calculates:
+
+```text
+News = 100 × Σ(sentiment × recency weight) ÷ Σ(recency weight)
+```
+
+The recency weight decays exponentially, with a half-life equal to one third of the selected window and a minimum of 12 hours. Duplicate normalized titles are removed, and any single publisher contributes at most four articles. At least two eligible articles are required; otherwise the signal reports “Insufficient data.”
+
+## Divergence
+
+```text
+Divergence = Crowd − News
+```
+
+Positive divergence means the crowd is more bullish than recent coverage; negative divergence means it is more bearish. Divergence is hidden with the crowd signal until after voting.
 
 ## Leaderboards
 
@@ -34,13 +52,13 @@ The MVP uses:
 
 These controls discourage casual duplicate voting. They are not proof of personhood and do not stop determined attackers who rotate devices, cookies, or networks.
 
-## Instrument data
+## Instrument and news data
 
-The MVP intentionally omits market charts and quotes from the rating surface. The database snapshot includes active US-locale instruments classified by Massive as common stock (`CS`) or exchange-traded fund (`ETF`); preferred shares, warrants, rights, bonds, ETNs, and other provider types are excluded. Company and fund names and classifications come from provider reference data. This keeps the experience focused on crowd sentiment and prevents that sentiment from being confused with price analysis.
+The database snapshot includes active US-locale instruments classified by Massive as common stock (`CS`) or exchange-traded fund (`ETF`); preferred shares, warrants, rights, bonds, ETNs, and other provider types are excluded. Company profiles and recent ticker-specific news also come from Massive. Profiles are cached for seven days and news for 30 minutes, with stale-cache fallback during temporary provider failures.
 
 ## Interpretation
 
-Hotness represents audience sentiment in this product. It does not measure:
+The signals represent audience sentiment and news tone. They do not measure:
 
 - Fair value or expected return
 - Fundamental quality

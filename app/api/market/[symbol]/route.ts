@@ -31,25 +31,6 @@ type MarketPayload = {
 };
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
-let cacheReady = false;
-
-async function ensureCache() {
-  if (cacheReady) return;
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS market_cache (
-      symbol TEXT NOT NULL,
-      range TEXT NOT NULL CHECK (range IN ('5d','ytd','1y')),
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      PRIMARY KEY(symbol, range)
-    )`),
-    env.DB.prepare(
-      'CREATE INDEX IF NOT EXISTS idx_market_cache_fetched ON market_cache(fetched_at)',
-    ),
-    env.DB.prepare('PRAGMA optimize'),
-  ]);
-  cacheReady = true;
-}
 
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -94,7 +75,6 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ symbol: string }> },
 ) {
-  await ensureCache();
   const { symbol: rawSymbol } = await context.params;
   const symbol = rawSymbol.toUpperCase();
   const range = (request.nextUrl.searchParams.get('range') ?? '5d') as Range;

@@ -1,38 +1,17 @@
-import { StockApp } from '@/components/stock-app';
-import { listInstruments } from '@/lib/instruments.server';
+import { redirect } from 'next/navigation';
+import { getRandomInstrument } from '@/lib/instruments.server';
 
-function shuffled<T>(items: T[]) {
-  const result = [...items];
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
-  }
-  return result;
-}
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ ticker?: string }>;
-}) {
-  const { ticker } = await searchParams;
-  const instruments = await listInstruments();
-
-  if (instruments.length === 0) {
+export default async function Home() {
+  const instrument = await getRandomInstrument();
+  if (!instrument)
     return (
-      <main className="grid min-h-screen place-items-center bg-[#071619] px-6 text-center text-[#f5f1e8]">
+      <main className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#9fb7bd]">
-            StockOrNot
-          </p>
+          <p className="text-sm font-bold uppercase tracking-[0.22em] text-primary">StockOrNot</p>
           <h1 className="mt-3 text-3xl font-black">Catalog initializing</h1>
-          <p className="mt-3 text-[#9fb7bd]">
-            The stock and ETF universe will be ready shortly.
-          </p>
+          <p className="mt-3 text-muted-foreground">The stock and ETF universe will be ready shortly.</p>
         </div>
       </main>
     );
-  }
-
-  return <StockApp initialSymbol={ticker} stocks={shuffled(instruments)} />;
+  redirect(`/ticker/${instrument.symbol.toLowerCase()}`);
 }

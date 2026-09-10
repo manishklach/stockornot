@@ -67,3 +67,16 @@ export const instruments = sqliteTable(
     index('idx_instruments_name').on(table.name),
   ],
 );
+
+export const intelligenceCache = sqliteTable(
+  'intelligence_cache',
+  {
+    symbol: text('symbol').notNull(),
+    kind: text('kind').notNull(),
+    payload: text('payload').notNull(),
+    fetchedAt: integer('fetched_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.symbol, table.kind] }),
+  ],
+);

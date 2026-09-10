@@ -2,37 +2,41 @@
 
 ![StockOrNot — Rate the Market](public/og.png)
 
-**A fast, playful sentiment layer for US stocks and ETFs.** Vote **Hot**, **Not**, or **Skip**, then reveal what the crowd thinks.
+**A per-ticker intelligence dashboard for US stocks and ETFs.** Compare recent news tone with community opinion, vote **Hot** or **Not**, and reveal where the signals diverge.
 
 [Open the database-backed MVP](https://stockornot.abc123xyza.chatgpt.site)
 
 ## Why StockOrNot?
 
-Financial products are usually presented as dense tables, expert opinions, or noisy social feeds. StockOrNot asks one deliberately simple question: _how does the crowd feel about this ticker right now?_
+Financial products are usually presented as dense tables, expert opinions, or noisy social feeds. StockOrNot separates two simpler questions: _what is the recent news environment saying, and how does the crowd feel?_
 
 The product separates that sentiment signal from investment analysis. Scores are not forecasts or recommendations; they are a transparent snapshot of community mood.
 
 ## MVP features
 
-- Rapid **Hot / Not / Skip** voting across a database-backed universe of 10,743 active US stocks and ETFs
-- Crowd score revealed only after voting, reducing anchoring and herd behavior
+- Per-ticker intelligence dashboards across a database-backed universe of 10,743 active US stocks and ETFs
+- Real company or fund profiles and ticker-specific news from Massive
+- Transparent news sentiment on 24-hour, 7-day, and 30-day windows
+- Integrated **Hot / Not** voting with crowd score revealed only after voting
+- Crowd-versus-news divergence on a shared −100 to +100 scale
+- Deduplicated recent headlines, ticker-specific sentiment reasoning, and coverage quality
+- D1-backed profile and news cache with stale-data fallback
 - Persistent anonymous voting backed by Cloudflare D1
 - One current vote per device, ticker, and day with server-side validation
 - Hottest, coldest, and most-divisive leaderboards
-- Stock and ETF filters, ticker search, and keyboard shortcuts
-- Shareable ticker detail pages focused on identity and crowd sentiment
+- Database-backed ticker search and random discovery
+- Shareable ticker dashboards with product-specific metadata
 - Responsive, accessible interface with reduced-motion support
-- A deliberately focused rating card showing only ticker and full company or fund name
 - Clear methodology and financial disclaimers
 - Branded Open Graph and X/Twitter preview metadata
 
 ## Product loop
 
 ```text
-See ticker → Vote → Reveal crowd → Explore ranking → Next ticker
+Open ticker → Read profile and news signal → Vote → Reveal crowd and divergence → Explore another ticker
 ```
 
-The crowd score is intentionally hidden before a vote. After voting, the user sees the percentage of Hot votes and the total response count, then advances to another ticker.
+News sentiment is visible independently. The crowd score and divergence remain hidden until the user votes, reducing anchoring on existing community opinion.
 
 ## Technology
 
@@ -68,19 +72,21 @@ See [Development](docs/DEVELOPMENT.md) for the complete contributor workflow.
 
 ## Data and scoring
 
-The MVP ships with a D1 catalog snapshot of 5,317 common stocks and 5,426 ETFs sourced from Massive's active US ticker reference data. It intentionally omits market charts and quotes: the rating surface focuses on the ticker, full company or fund name, and the user's Hot or Not decision. New crowd votes are stored persistently and combined with deterministic seeded vote totals so the initial product experience has meaningful rankings.
+The MVP ships with a D1 catalog snapshot of 5,317 common stocks and 5,426 ETFs sourced from Massive's active US ticker reference data. Massive also supplies ticker profiles, recent news, and ticker-specific positive, neutral, or negative insights. StockOrNot deduplicates headlines, limits publisher concentration, and applies exponential recency weighting.
 
 For ticker `t`:
 
 ```text
-hotness(t) = hot_votes(t) / (hot_votes(t) + not_votes(t)) × 100
+crowd(t) = 100 × (hot_votes(t) − not_votes(t)) / total_votes(t)
+news(t)  = 100 × Σ(sentiment × recency_weight) / Σ(recency_weight)
+divergence(t) = crowd(t) − news(t)
 ```
 
 See [Methodology](docs/METHODOLOGY.md) for score semantics, abuse controls, and limitations.
 
 ## Architecture
 
-The client renders the voting flow and requests aggregate scores from a server route. Voting is validated and persisted in D1.
+Server-rendered ticker dashboards combine the D1 instrument and vote data with cached Massive profile and news intelligence. Client interactions handle voting, search, time-window changes, and random discovery.
 
 See [Architecture](docs/ARCHITECTURE.md) for the system boundaries, data model, and request flow.
 
@@ -100,4 +106,4 @@ StockOrNot is for entertainment and informational discovery only. Nothing in the
 
 ## Project status
 
-Version **0.4.1** uses the complete D1-backed instrument universe and randomizes the rating queue on every visit. The next product milestone is scheduled catalog synchronization, paginated discovery, rolling sentiment windows, and stronger abuse defenses.
+Version **0.5.0** introduces the ticker intelligence dashboard, real news sentiment, integrated voting, and crowd-versus-news divergence. The next milestone is scheduled catalog synchronization, organic-only crowd rollups, and stronger abuse defenses.

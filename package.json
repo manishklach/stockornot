@@ -1,7 +1,7 @@
 {
   "name": "stockornot",
-  "version": "0.4.1",
-  "description": "A fast, playful crowd-sentiment app for rating US stocks and ETFs.",
+  "version": "0.5.0",
+  "description": "A ticker intelligence dashboard comparing news sentiment with crowd opinion.",
   "homepage": "https://stockornot.abc123xyza.chatgpt.site",
   "repository": {
     "type": "git",

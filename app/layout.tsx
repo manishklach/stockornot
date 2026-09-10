@@ -19,27 +19,27 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ??
       'https://stockornot.abc123xyza.chatgpt.site',
   ),
-  title: 'StockOrNot — Rate the Market',
+  title: 'StockOrNot — Market Sentiment Intelligence',
   description:
-    'Vote hot or not on US stocks and ETFs, then see what the crowd thinks.',
+    'Compare ticker-specific news sentiment with community Hot or Not opinion across US stocks and ETFs.',
   openGraph: {
-    title: 'StockOrNot — Rate the Market',
+    title: 'StockOrNot — Market Sentiment Intelligence',
     description:
-      'Vote hot or not on US stocks and ETFs, then see what the crowd thinks.',
+      'Compare ticker-specific news sentiment with community Hot or Not opinion across US stocks and ETFs.',
     images: [
       {
         url: socialImage,
         width: 1200,
         height: 630,
-        alt: 'StockOrNot — Rate the Market',
+        alt: 'StockOrNot — Market Sentiment Intelligence',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'StockOrNot — Rate the Market',
+    title: 'StockOrNot — Market Sentiment Intelligence',
     description:
-      'Vote hot or not on US stocks and ETFs, then see what the crowd thinks.',
+      'Compare ticker-specific news sentiment with community Hot or Not opinion across US stocks and ETFs.',
     images: [socialImage],
   },
 };

@@ -4,32 +4,6 @@ import { getInstrument, listInstruments } from '@/lib/instruments.server';
 import { score } from '@/lib/stocks';
 
 const COOKIE = 'stockornot_voter';
-let databaseReady = false;
-
-async function ensureDatabase() {
-  if (databaseReady) return;
-  await env.DB.batch([
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS votes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      voter_key TEXT NOT NULL,
-      symbol TEXT NOT NULL,
-      rating TEXT NOT NULL CHECK (rating IN ('hot','not')),
-      vote_day TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    )`),
-    env.DB.prepare(
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_votes_voter_symbol_day ON votes(voter_key, symbol, vote_day)',
-    ),
-    env.DB.prepare(
-      'CREATE INDEX IF NOT EXISTS idx_votes_symbol_rating ON votes(symbol, rating)',
-    ),
-    env.DB.prepare(
-      'CREATE INDEX IF NOT EXISTS idx_votes_voter_created ON votes(voter_key, created_at)',
-    ),
-    env.DB.prepare('PRAGMA optimize'),
-  ]);
-  databaseReady = true;
-}
 
 function cookieValue(request: NextRequest) {
   const existing = request.cookies.get(COOKIE)?.value;
@@ -52,7 +26,6 @@ async function totals() {
 }
 
 export async function GET(request: NextRequest) {
-  await ensureDatabase();
   const { voter, fresh } = cookieValue(request);
   const response = NextResponse.json({ scores: await totals() });
   if (fresh)
@@ -67,7 +40,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  await ensureDatabase();
   const { voter, fresh } = cookieValue(request);
   const body = (await request.json().catch(() => null)) as {
     symbol?: string;

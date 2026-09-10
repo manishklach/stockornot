@@ -2,38 +2,42 @@
 
 ## Overview
 
-StockOrNot is a React application deployed as a Cloudflare Worker through OpenAI Sites. It stores the instrument catalog and user-generated votes in Cloudflare D1. A server-side import script snapshots active US common stocks and ETFs from Massive into a versioned migration.
+StockOrNot is a React application deployed as a Cloudflare Worker through OpenAI Sites. It stores the instrument catalog, user-generated votes, and intelligence cache in Cloudflare D1. Massive supplies ticker profiles and ticker-specific news insights through a server-only integration.
 
 ```text
 Browser
-  ├─ React voting and discovery UI
+  ├─ Per-ticker intelligence dashboard
+  ├─ Integrated voting, ticker search, and time-window controls
   ├─ Anonymous HTTP-only voter cookie
-  ├─ Database-backed voting queue, filters, search, and leaderboards
-  └─ GET / POST /api/votes
+  ├─ GET /api/search
+  └─ POST /api/votes
                  │
                  ▼
 Cloudflare Worker route
   ├─ Input validation
   ├─ Duplicate and velocity checks
-  ├─ Vote aggregation
+  ├─ Vote aggregation and divergence calculation
+  ├─ Massive profile/news normalization
+  ├─ Recency weighting, deduplication, and publisher caps
   └─ Prepared D1 statements
-           │
-           ▼
-Cloudflare D1
+           │                 │
+           ▼                 ▼
+Cloudflare D1             Massive API
   ├─ instruments
   ├─ votes
+  ├─ intelligence_cache
   └─ market_cache
 ```
 
 ## Application surfaces
 
-### Rating surface
+### Ticker dashboard
 
-`/` owns the main interaction. The server loads the active instrument universe with aggregate scores, then the client filters it, submits votes, and reveals the crowd result. Search, leaderboard views, and keyboard shortcuts are kept in the same interaction surface to preserve the rapid loop.
+`/` chooses a random active instrument and redirects to `/ticker/:symbol`. The ticker dashboard combines identity, profile, news sentiment, coverage, voting, crowd-versus-news divergence, and recent headlines. The crowd signal remains hidden until the current visitor votes.
 
-### Ticker details
+### Leaderboard and discovery
 
-`/ticker/:symbol` renders an independently addressable ticker view with product-specific title and description metadata. Detail pages intentionally clear the generic social image because the MVP does not yet have a trustworthy ticker-specific primary image.
+`/leaderboard` renders database-ranked hottest, coldest, and most-divisive instruments. `/api/search` performs bounded symbol and company-name lookup without sending the complete catalog to the browser.
 
 ### Methodology
 
@@ -43,7 +47,7 @@ Cloudflare D1
 
 `/api/votes` supports:
 
-- `GET`: initializes the database when needed and returns aggregate scores.
+- `GET`: returns aggregate scores for compatibility and diagnostics.
 - `POST`: validates `{ symbol, rating }`, applies abuse controls, upserts the current daily vote, and returns refreshed scores.
 
 ### Market API
@@ -69,13 +73,16 @@ The unique index on `(voter_key, symbol, vote_day)` makes repeat submissions upd
 
 The `market_cache` table stores normalized JSON by `(symbol, range)` together with its fetch time. A fetch-time index supports future cache maintenance.
 
+The `intelligence_cache` table stores normalized profile and news-signal payloads by `(symbol, kind)`. Profiles remain fresh for seven days; news signals remain fresh for 30 minutes. Stale cached values are returned when an upstream refresh fails.
+
 ## Trust boundaries
 
 - Browser input is untrusted. The server validates symbols and rating values.
 - The anonymous cookie is an abuse-reduction mechanism, not strong identity.
 - Seeded totals and catalog rows are versioned application content; vote rows are community-generated state.
 - The Massive API credential exists only in the Worker environment and local ignored environment files.
-- Market history is timestamped and labeled as adjusted and delayed; it is never represented as a real-time quote.
+- Provider URLs are restricted to HTTP or HTTPS before rendering.
+- News tone is represented as sentiment, never as a forecast or recommendation.
 - The Worker is the only layer with direct database access.
 
 ## Deployment model
@@ -84,4 +91,4 @@ Vinext produces Cloudflare Worker-compatible ESM output. `.openai/hosting.json` 
 
 ## Known scaling limits
 
-The current home response sends the complete 10,743-instrument catalog to the client and the aggregate query groups the vote set on request. The next scaling step is server-side pagination/search plus precomputed sentiment rollups. Cookie-based identity should also be augmented by edge rate limiting and anomaly detection before opening voting to a broad public audience.
+Vote aggregation is still performed on request and the crowd totals include a deterministic launch baseline. The next scaling step is an organic-only rollup table with time windows and confidence metrics. Cookie-based identity should also be augmented by edge rate limiting and anomaly detection before opening voting broadly.
