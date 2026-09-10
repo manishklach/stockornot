@@ -211,9 +211,9 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
                 {query && (
                   <div className="absolute right-0 top-11 z-30 w-[300px] overflow-hidden rounded-[8px] border border-[#2a3545] bg-[#111a28] shadow-2xl">
                     {searching ? <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">Searching…</p> : results.length ? results.map((result) => (
-                      <Link key={result.symbol} href={`/ticker/${result.symbol.toLowerCase()}`} className="flex items-center justify-between border-b border-[#26303e] px-4 py-3 text-[13px] last:border-0 hover:bg-[#182232]">
+                      <a key={result.symbol} href={`/ticker/${result.symbol.toLowerCase()}`} className="flex items-center justify-between border-b border-[#26303e] px-4 py-3 text-[13px] last:border-0 hover:bg-[#182232]">
                         <span className="min-w-0 truncate"><strong>{result.symbol}</strong> <span className="ml-2 text-[#9ca9b8]">{result.name}</span></span><span className="ml-3 text-[11px] text-[#7f8b9a]">{result.type}</span>
-                      </Link>
+                      </a>
                     )) : <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">No matching ticker</p>}
                   </div>
                 )}
