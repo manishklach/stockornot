@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { SyntheticEvent } from 'react';
 import Link from 'next/link';
 import { Search, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -149,6 +150,15 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
     window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?window=${next}`);
   }
 
+  function submitSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>) {
+    event.preventDefault();
+    const normalized = query.trim().toUpperCase();
+    if (!normalized) return;
+    const match = results.find((result) => result.symbol === normalized) ?? results[0];
+    const symbol = match?.symbol ?? (/^[A-Z][A-Z0-9.-]{0,9}$/.test(normalized) ? normalized : null);
+    if (symbol) window.location.assign(`/ticker/${symbol.toLowerCase()}`);
+  }
+
   async function vote(rating: 'hot' | 'not') {
     if (voteState === 'saving') return;
     setVoteState('saving');
@@ -194,9 +204,10 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
           <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-[11px] font-bold uppercase tracking-[.17em] text-[#9db7e8]">Market intelligence</p><h1 className="mt-1 text-[28px] font-bold leading-tight tracking-[-.04em]">Company Dashboard</h1></div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
+              <form className="relative" onSubmit={submitSearch}>
                 <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#8997a8]" />
-                <Input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={stock.symbol} aria-label="Search ticker or company" className="h-9 w-[138px] rounded-[7px] border-[#2a3545] bg-[#0e1724] pl-9 text-[13px] font-semibold" />
+                <Input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={stock.symbol} aria-label="Search ticker or company" autoComplete="off" className="h-9 w-[138px] rounded-[7px] border-[#2a3545] bg-[#0e1724] pl-9 text-[13px] font-semibold" />
+                <button type="submit" className="sr-only">Open ticker</button>
                 {query && (
                   <div className="absolute right-0 top-11 z-30 w-[300px] overflow-hidden rounded-[8px] border border-[#2a3545] bg-[#111a28] shadow-2xl">
                     {searching ? <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">Searching…</p> : results.length ? results.map((result) => (
@@ -206,7 +217,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
                     )) : <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">No matching ticker</p>}
                   </div>
                 )}
-              </div>
+              </form>
               <select value={signalWindow} onChange={(event) => changeWindow(event.target.value)} className="h-9 rounded-[7px] border border-[#2a3545] bg-[#0e1724] px-3 text-[13px] font-semibold outline-none focus:border-[#6d83bf]">
                 <option value="24h">24 hours</option><option value="7d">7 days</option><option value="30d">30 days</option>
               </select>
