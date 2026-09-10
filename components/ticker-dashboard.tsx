@@ -1,97 +1,104 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  Activity,
-  BarChart3,
-  Building2,
-  CalendarDays,
-  ExternalLink,
-  Flame,
-  Gauge,
-  Globe2,
-  Info,
-  Newspaper,
-  Search,
-  Shuffle,
-  Snowflake,
-  Users,
-} from 'lucide-react';
+import { Search, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { SignalWindow, TickerIntelligence } from '@/lib/intelligence';
+import type { NewsItem, SignalWindow, TickerIntelligence } from '@/lib/intelligence';
 import type { Stock } from '@/lib/stocks';
 
 type SearchResult = Pick<Stock, 'symbol' | 'name' | 'type'>;
+type NewsBucket = 'company' | 'stock' | 'macro';
 
-function signed(value: number | null) {
+const windowLabel: Record<SignalWindow, string> = {
+  '24h': 'Last 24 hours',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+};
+
+function signed(value: number | null, decimals = 0) {
   if (value === null) return '—';
-  return `${value > 0 ? '+' : ''}${value}`;
+  return `${value > 0 ? '+' : ''}${value.toFixed(decimals)}`;
 }
 
-function signalClass(value: number | null) {
-  if (value === null) return 'text-muted-foreground';
-  if (value > 15) return 'text-primary';
-  if (value < -15) return 'text-destructive';
-  return 'text-[#ffd479]';
+function tone(value: number | null) {
+  if (value === null) return 'text-[#9aa8b8]';
+  if (value > 15) return 'text-[#79e6ad]';
+  if (value < -15) return 'text-[#ff7f9f]';
+  return 'text-[#c5b8ff]';
 }
 
-function signalLabel(value: number) {
+function label(value: number | null) {
+  if (value === null) return 'Not enough data';
   if (value > 15) return 'Positive';
   if (value < -15) return 'Negative';
   return 'Mixed';
 }
 
-function formatCompact(value: number | null) {
-  if (value === null) return 'Not available';
-  return new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value);
+function classify(article: NewsItem): NewsBucket {
+  const text = `${article.title} ${article.reasoning ?? ''}`.toLowerCase();
+  if (/analyst|price target|upgrade|downgrade|forecast|estimate|rating|outlook/.test(text)) return 'stock';
+  if (/federal reserve|interest rate|inflation|economy|economic|industry|sector|tariff|regulation|macro|market-wide|supply chain/.test(text)) return 'macro';
+  return 'company';
 }
 
-function timeAgo(value: string, referenceTime: number) {
-  const seconds = Math.max(1, Math.round((referenceTime - Date.parse(value)) / 1000));
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+function bucketSignal(articles: NewsItem[], bucket: NewsBucket, signalWindow: SignalWindow, calculatedAt: number) {
+  const selected = articles.filter((article) => classify(article) === bucket);
+  const halfLifeHours = Math.max(12, ({ '24h': 24, '7d': 168, '30d': 720 } as const)[signalWindow] / 3);
+  let totalWeight = 0;
+  let weightedScore = 0;
+  for (const article of selected) {
+    const ageHours = Math.max(0, (calculatedAt - Date.parse(article.publishedAt)) / 3_600_000);
+    const weight = 2 ** (-ageHours / halfLifeHours);
+    const value = article.sentiment === 'positive' ? 1 : article.sentiment === 'negative' ? -1 : 0;
+    weightedScore += value * weight;
+    totalWeight += weight;
+  }
+  return {
+    articles: selected,
+    score: selected.length && totalWeight ? Math.round((weightedScore / totalWeight) * 100) : null,
+    positive: selected.filter((article) => article.sentiment === 'positive').length,
+    neutral: selected.filter((article) => article.sentiment === 'neutral').length,
+    negative: selected.filter((article) => article.sentiment === 'negative').length,
+  };
 }
 
-function SignalBar({ value }: { value: number | null }) {
-  const position = value === null ? 50 : (value + 100) / 2;
+function SignalMeter({ value }: { value: number | null }) {
+  const width = value === null ? 0 : Math.max(3, Math.abs(value));
   return (
-    <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-      <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-destructive/70 to-transparent" />
-      <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-primary/70 to-transparent" />
-      {value !== null && (
-        <span
-          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#101a26] bg-white shadow"
-          style={{ left: `${position}%` }}
-        />
-      )}
+    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#242e3d]">
+      <div className={`h-full rounded-full ${value !== null && value < -15 ? 'bg-[#ff7f9f]' : value !== null && value <= 15 ? 'bg-[#b8a6ff]' : 'bg-[#79e6ad]'}`} style={{ width: `${width}%` }} />
     </div>
   );
 }
 
-export function TickerDashboard({
-  stock,
-  nextSymbol,
-  intelligence,
-  signalWindow,
-}: {
-  stock: Stock;
-  nextSymbol: string;
-  intelligence: TickerIntelligence;
-  signalWindow: SignalWindow;
-}) {
-  const [selectedVote, setSelectedVote] = useState<'hot' | 'not' | null>(null);
+function SignalCard({ title, score, count, positive, neutral, negative }: { title: string; score: number | null; count: number; positive: number; neutral: number; negative: number }) {
+  return (
+    <article className="min-h-[154px] rounded-[10px] border border-[#2a3545] bg-[#111a28] p-4">
+      <p className="text-[13px] font-bold text-[#e9edf4]">{title}</p>
+      <div className="mt-4 flex items-end gap-2">
+        <strong className={`font-mono text-[34px] font-black leading-none tracking-[-.05em] ${tone(score)}`}>{signed(score, 1)}</strong>
+        <span className={`pb-0.5 text-[12px] font-semibold ${tone(score)}`}>{label(score)}</span>
+      </div>
+      <SignalMeter value={score} />
+      <p className="mt-3 text-[11px] text-[#a1adbc]">{count} {count === 1 ? 'item' : 'items'} · {positive} positive · {neutral} neutral · {negative} negative</p>
+    </article>
+  );
+}
+
+function relativeTime(value: string, now: number) {
+  const hours = Math.max(0, Math.round((now - Date.parse(value)) / 3_600_000));
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow }: { stock: Stock; nextSymbol: string; intelligence: TickerIntelligence; signalWindow: SignalWindow }) {
   const [hot, setHot] = useState(stock.hot);
   const [not, setNot] = useState(stock.not);
-  const [notice, setNotice] = useState('');
+  const [voteState, setVoteState] = useState<'hot' | 'not' | 'saving' | null>(null);
+  const [voteError, setVoteError] = useState('');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -102,9 +109,7 @@ export function TickerDashboard({
     const timeout = window.setTimeout(async () => {
       setSearching(true);
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         const data = (await response.json()) as { results?: SearchResult[] };
         setResults(data.results ?? []);
       } catch {
@@ -119,6 +124,19 @@ export function TickerDashboard({
     };
   }, [query]);
 
+  const company = bucketSignal(intelligence.news.articles, 'company', signalWindow, intelligence.news.calculatedAt);
+  const stockNews = bucketSignal(intelligence.news.articles, 'stock', signalWindow, intelligence.news.calculatedAt);
+  const macro = bucketSignal(intelligence.news.articles, 'macro', signalWindow, intelligence.news.calculatedAt);
+  const crowdScore = Math.round(((hot - not) / Math.max(1, hot + not)) * 100);
+  const divergence = intelligence.news.score === null ? null : crowdScore - intelligence.news.score;
+  const divergenceCopy = divergence === null
+    ? 'More ticker-specific reporting is needed before the signals can be compared.'
+    : Math.abs(divergence) < 15
+      ? 'Crowd sentiment and the professional news environment are broadly aligned.'
+      : divergence > 0
+        ? 'Crowd sentiment is materially more bullish than the professional news environment.'
+        : 'Crowd sentiment is materially more bearish than the professional news environment.';
+
   function updateQuery(value: string) {
     setQuery(value);
     if (!value.trim()) {
@@ -127,313 +145,135 @@ export function TickerDashboard({
     }
   }
 
-  const crowdHotPercent = Math.round((hot / Math.max(1, hot + not)) * 100);
-  const crowdSignal = Math.round(((hot - not) / Math.max(1, hot + not)) * 100);
-  const divergence =
-    intelligence.news.score === null ? null : crowdSignal - intelligence.news.score;
-  const visibleDivergence = selectedVote ? divergence : null;
-
-  const divergenceCopy = useMemo(() => {
-    if (visibleDivergence === null)
-      return intelligence.news.score === null
-        ? 'More ticker-specific news is needed before the two signals can be compared.'
-        : 'Vote to reveal how crowd opinion compares with recent news coverage.';
-    if (Math.abs(visibleDivergence) < 15)
-      return 'Crowd opinion and recent news coverage are broadly aligned.';
-    return visibleDivergence > 0
-      ? 'The crowd is materially more bullish than the recent news environment.'
-      : 'The crowd is materially more bearish than the recent news environment.';
-  }, [intelligence.news.score, visibleDivergence]);
+  function changeWindow(next: string) {
+    window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?window=${next}`);
+  }
 
   async function vote(rating: 'hot' | 'not') {
-    if (selectedVote) return;
-    setSelectedVote(rating);
-    setNotice('');
+    if (voteState === 'saving') return;
+    setVoteState('saving');
+    setVoteError('');
     try {
       const response = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ symbol: stock.symbol, rating }),
       });
-      const data = (await response.json()) as {
-        score?: { hot: number; not: number };
-        error?: string;
-      };
-      if (!response.ok || !data.score)
-        throw new Error(data.error || 'Vote could not be saved.');
+      const data = (await response.json()) as { score?: { hot: number; not: number }; error?: string };
+      if (!response.ok || !data.score) throw new Error(data.error || 'Vote could not be saved.');
       setHot(data.score.hot);
       setNot(data.score.not);
+      setVoteState(rating);
     } catch (error) {
-      setSelectedVote(null);
-      setNotice(error instanceof Error ? error.message : 'Vote could not be saved.');
+      setVoteState(null);
+      setVoteError(error instanceof Error ? error.message : 'Vote could not be saved.');
     }
   }
 
-  function changeWindow(next: string) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('window', next);
-    window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?${params}`);
-  }
-
   return (
-    <main className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="hidden min-h-screen border-r border-white/8 bg-[#08111b] px-5 py-6 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <Link href="/" className="flex items-center gap-3" aria-label="StockOrNot home">
-          <span className="grid size-10 place-items-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
-            S
-          </span>
-          <span>
-            <strong className="block text-lg tracking-[-0.04em]">
-              STOCK<span className="text-primary">OR</span>NOT
-            </strong>
-            <small className="block text-xs text-muted-foreground">Market sentiment monitor</small>
-          </span>
+    <main className="min-h-screen bg-[#08111d] text-[#f4f6fb] lg:grid lg:grid-cols-[226px_minmax(0,1fr)]">
+      <aside className="hidden min-h-screen border-r border-[#202a38] bg-[#09121e] px-5 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="grid size-9 place-items-center rounded-[9px] bg-[#8da8ff] text-sm font-black text-[#0a1320]">S</span>
+          <span><strong className="block text-[15px] leading-5">StockOrNot</strong><small className="block text-[11px] text-[#9ca9b8]">Market information monitor</small></span>
         </Link>
-
-        <nav className="mt-10 space-y-2 text-sm font-semibold" aria-label="Main navigation">
-          <Link href={`/ticker/${stock.symbol.toLowerCase()}`} className="flex items-center gap-3 rounded-xl bg-white/7 px-4 py-3 text-foreground">
-            <Gauge className="size-4 text-primary" /> Dashboard
-          </Link>
-          <Link href="/leaderboard" className="flex items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition hover:bg-white/4 hover:text-foreground">
-            <BarChart3 className="size-4" /> Leaderboard
-          </Link>
-          <Link href="/methodology" className="flex items-center gap-3 rounded-xl px-4 py-3 text-muted-foreground transition hover:bg-white/4 hover:text-foreground">
-            <Info className="size-4" /> Methodology
-          </Link>
+        <nav className="mt-8 space-y-1 text-[14px]" aria-label="Main navigation">
+          <Link href={`/ticker/${stock.symbol.toLowerCase()}`} className="block rounded-[7px] bg-[#182232] px-3 py-2.5 font-semibold">Dashboard</Link>
+          <a href="#recent-information" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Sources</a>
+          <Link href="/methodology" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Methodology</Link>
+          <Link href="/leaderboard" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Leaderboard</Link>
         </nav>
-
-        <div className="mt-auto border-t border-white/8 pt-5 text-xs leading-5 text-muted-foreground">
-          <p className="font-bold text-foreground">Signals, separated.</p>
-          <p className="mt-1">News tone and community opinion are calculated independently.</p>
+        <div className="mt-auto border-t border-[#26303e] pt-4 text-[11px] leading-4 text-[#9ca9b8]">
+          <p className="font-semibold text-[#f0f3f8]">MVP</p>
+          <p className="mt-1">News and crowd are isolated signals. Sentiment is not a return forecast.</p>
         </div>
       </aside>
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-30 border-b border-white/8 bg-background/90 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 max-w-[1500px] items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <Link href="/" className="flex items-center gap-2 lg:hidden">
-              <span className="grid size-8 place-items-center rounded-lg bg-primary text-sm font-black text-primary-foreground">S</span>
-              <strong className="hidden tracking-[-0.04em] sm:block">STOCK<span className="text-primary">OR</span>NOT</strong>
-            </Link>
-            <div className="relative ml-auto w-full max-w-md">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => updateQuery(event.target.value)}
-                placeholder="Search ticker or company"
-                aria-label="Search ticker or company"
-                className="h-10 border-white/10 bg-white/5 pl-10 text-sm"
-              />
-              {(query || searching) && (
-                <div className="absolute left-0 right-0 top-12 overflow-hidden rounded-xl border border-white/10 bg-[#111c28] shadow-2xl">
-                  {searching ? (
-                    <p className="p-4 text-sm text-muted-foreground">Searching…</p>
-                  ) : results.length ? (
-                    results.map((result) => (
-                      <Link key={result.symbol} href={`/ticker/${result.symbol.toLowerCase()}`} className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-3 text-sm last:border-0 hover:bg-white/5">
-                        <span className="min-w-0">
-                          <strong className="mr-2">{result.symbol}</strong>
-                          <span className="truncate text-muted-foreground">{result.name}</span>
-                        </span>
-                        <small className="shrink-0 text-xs text-muted-foreground">{result.type}</small>
+      <section className="min-w-0">
+        <div className="mx-auto w-full max-w-[1240px] px-4 py-5 sm:px-7 lg:px-8">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div><p className="text-[11px] font-bold uppercase tracking-[.17em] text-[#9db7e8]">Market intelligence</p><h1 className="mt-1 text-[28px] font-bold leading-tight tracking-[-.04em]">Company Dashboard</h1></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#8997a8]" />
+                <Input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={stock.symbol} aria-label="Search ticker or company" className="h-9 w-[138px] rounded-[7px] border-[#2a3545] bg-[#0e1724] pl-9 text-[13px] font-semibold" />
+                {query && (
+                  <div className="absolute right-0 top-11 z-30 w-[300px] overflow-hidden rounded-[8px] border border-[#2a3545] bg-[#111a28] shadow-2xl">
+                    {searching ? <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">Searching…</p> : results.length ? results.map((result) => (
+                      <Link key={result.symbol} href={`/ticker/${result.symbol.toLowerCase()}`} className="flex items-center justify-between border-b border-[#26303e] px-4 py-3 text-[13px] last:border-0 hover:bg-[#182232]">
+                        <span className="min-w-0 truncate"><strong>{result.symbol}</strong> <span className="ml-2 text-[#9ca9b8]">{result.name}</span></span><span className="ml-3 text-[11px] text-[#7f8b9a]">{result.type}</span>
                       </Link>
-                    ))
-                  ) : (
-                    <p className="p-4 text-sm text-muted-foreground">No matching ticker</p>
-                  )}
-                </div>
-              )}
-            </div>
-            <Link href={`/ticker/${nextSymbol.toLowerCase()}`}>
-              <Button variant="outline" className="h-10 shrink-0 border-white/10 bg-white/5 px-3 text-foreground sm:px-4">
-                <Shuffle className="size-4" />
-                <span className="hidden sm:inline">Random</span>
-              </Button>
-            </Link>
-          </div>
-        </header>
-
-        <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex min-w-0 items-start gap-4">
-              <span style={{ backgroundColor: stock.color }} className="grid size-14 shrink-0 place-items-center rounded-2xl text-lg font-black text-[#071014] sm:size-16 sm:text-xl">
-                {stock.symbol.slice(0, 2)}
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[.18em] text-primary">Ticker intelligence</p>
-                <div className="mt-1 flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-black tracking-[-.045em] sm:text-4xl">{stock.name}</h1>
-                  <span className="rounded-md bg-white/7 px-2 py-1 font-mono text-sm font-black">{stock.symbol}</span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {intelligence.profile?.industry ?? stock.type} · {intelligence.profile?.exchange ?? stock.sector}
-                </p>
-              </div>
-            </div>
-            <label className="flex items-center gap-3 text-sm font-semibold text-muted-foreground">
-              News window
-              <select value={signalWindow} onChange={(event) => changeWindow(event.target.value)} className="h-10 rounded-xl border border-white/10 bg-card px-3 text-sm font-bold text-foreground outline-none focus:border-primary">
-                <option value="24h">24 hours</option>
-                <option value="7d">7 days</option>
-                <option value="30d">30 days</option>
-              </select>
-            </label>
-          </div>
-
-          <section className="mt-6 grid gap-3 md:grid-cols-2 2xl:grid-cols-4" aria-label="Ticker signals">
-            <article className="rounded-2xl border border-white/9 bg-card p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold">News sentiment</p>
-                <Newspaper className="size-4 text-[#83b8ff]" />
-              </div>
-              <div className="mt-4 flex items-end gap-3">
-                <strong className={`font-mono text-4xl ${signalClass(intelligence.news.score)}`}>{signed(intelligence.news.score)}</strong>
-                <span className={`pb-1 text-sm font-bold ${signalClass(intelligence.news.score)}`}>{intelligence.news.label}</span>
-              </div>
-              <SignalBar value={intelligence.news.score} />
-              <p className="mt-4 text-xs text-muted-foreground">{intelligence.news.total} articles · {intelligence.news.positive} positive · {intelligence.news.neutral} neutral · {intelligence.news.negative} negative</p>
-            </article>
-
-            <article className="rounded-2xl border border-white/9 bg-card p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold">News coverage</p>
-                <Activity className="size-4 text-[#c6a7ff]" />
-              </div>
-              <div className="mt-4 flex items-end gap-3">
-                <strong className="font-mono text-4xl">{intelligence.news.total}</strong>
-                <span className="pb-1 text-sm font-bold text-[#c6a7ff]">{intelligence.news.coverage}</span>
-              </div>
-              <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/8">
-                <div className="h-full rounded-full bg-[#c6a7ff]" style={{ width: `${Math.min(100, intelligence.news.total * 10)}%` }} />
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground">{intelligence.news.sourceCount} distinct publishers after deduplication</p>
-            </article>
-
-            <article className="rounded-2xl border border-white/9 bg-card p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold">Company scale</p>
-                <Building2 className="size-4 text-[#ffd479]" />
-              </div>
-              <strong className="mt-4 block font-mono text-4xl">{formatCompact(intelligence.profile?.marketCap ?? null)}</strong>
-              <p className="mt-2 text-sm font-bold text-[#ffd479]">Market cap</p>
-              <p className="mt-7 text-xs text-muted-foreground">{formatCompact(intelligence.profile?.employees ?? null)} employees · {stock.type}</p>
-            </article>
-
-            <article className="rounded-2xl border border-primary/20 bg-[linear-gradient(145deg,rgba(185,245,69,.10),rgba(16,27,32,.96))] p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold">Your take</p>
-                <Users className="size-4 text-primary" />
-              </div>
-              {selectedVote ? (
-                <div className="reveal-enter">
-                  <div className="mt-4 flex items-end gap-3">
-                    <strong className={`font-mono text-4xl ${signalClass(crowdSignal)}`}>{signed(crowdSignal)}</strong>
-                    <span className={`pb-1 text-sm font-bold ${signalClass(crowdSignal)}`}>{signalLabel(crowdSignal)}</span>
+                    )) : <p className="px-4 py-3 text-[13px] text-[#9ca9b8]">No matching ticker</p>}
                   </div>
-                  <SignalBar value={crowdSignal} />
-                  <p className="mt-4 text-xs text-muted-foreground">You voted {selectedVote.toUpperCase()} · {crowdHotPercent}% Hot · {(hot + not).toLocaleString()} responses including launch baseline</p>
-                </div>
-              ) : (
-                <div className="mt-4">
-                  <p className="text-sm leading-6 text-muted-foreground">Vote before seeing the crowd signal.</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <Button onClick={() => vote('not')} className="h-11 bg-destructive font-black text-white hover:bg-[#ff7070]"><Snowflake /> Not</Button>
-                    <Button onClick={() => vote('hot')} className="h-11 font-black"><Flame /> Hot</Button>
-                  </div>
-                  {notice && <p className="mt-3 text-xs text-destructive">{notice}</p>}
-                </div>
-              )}
-            </article>
-          </section>
-
-          <section className="mt-3 grid gap-3 xl:grid-cols-[1.35fr_.65fr]">
-            <article className="rounded-2xl border border-white/9 bg-card p-5 sm:p-6">
-              <p className="text-sm font-bold">Crowd vs. news divergence</p>
-              <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <strong className={`font-mono text-5xl ${signalClass(visibleDivergence)}`}>{signed(visibleDivergence)}</strong>
-                  <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">{divergenceCopy}</p>
-                </div>
-                {!selectedVote && (
-                  <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-bold text-primary">Vote above to unlock</div>
                 )}
               </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-white/[.035] p-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">News signal</span>
-                  <strong className={`mt-2 block font-mono text-2xl ${signalClass(intelligence.news.score)}`}>{signed(intelligence.news.score)}</strong>
-                </div>
-                <div className="rounded-xl bg-white/[.035] p-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Crowd signal</span>
-                  <strong className={`mt-2 block font-mono text-2xl ${selectedVote ? signalClass(crowdSignal) : 'text-muted-foreground'}`}>{selectedVote ? signed(crowdSignal) : 'Hidden'}</strong>
-                </div>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-white/9 bg-card p-5 sm:p-6">
-              <p className="text-sm font-bold">Company profile</p>
-              <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5">
-                <div><dt>Asset</dt><dd>{stock.type}</dd></div>
-                <div><dt>Currency</dt><dd>{intelligence.profile?.currency ?? '—'}</dd></div>
-                <div><dt>Listed</dt><dd>{intelligence.profile?.listDate ?? '—'}</dd></div>
-                <div><dt>Exchange</dt><dd>{intelligence.profile?.exchange ?? stock.sector}</dd></div>
-              </dl>
-              {intelligence.profile?.homepageUrl && (
-                <a href={intelligence.profile.homepageUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
-                  <Globe2 className="size-4" /> Company website <ExternalLink className="size-3" />
-                </a>
-              )}
-            </article>
-          </section>
-
-          {intelligence.profile?.description && (
-            <section className="mt-3 rounded-2xl border border-white/9 bg-card p-5 sm:p-6">
-              <h2 className="text-sm font-bold">About {stock.symbol}</h2>
-              <p className="mt-3 max-w-5xl text-sm leading-7 text-muted-foreground">{intelligence.profile.description}</p>
-            </section>
-          )}
-
-          <section className="mt-3 overflow-hidden rounded-2xl border border-white/9 bg-card">
-            <div className="flex flex-col gap-2 border-b border-white/8 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <div>
-                <h2 className="text-lg font-black">Recent information</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Ticker-specific headlines used in the news signal.</p>
-              </div>
-              <div className="flex flex-wrap gap-3 text-xs font-bold">
-                <span className="text-primary">● Positive</span>
-                <span className="text-[#aebbc7]">● Neutral</span>
-                <span className="text-destructive">● Negative</span>
-              </div>
+              <select value={signalWindow} onChange={(event) => changeWindow(event.target.value)} className="h-9 rounded-[7px] border border-[#2a3545] bg-[#0e1724] px-3 text-[13px] font-semibold outline-none focus:border-[#6d83bf]">
+                <option value="24h">24 hours</option><option value="7d">7 days</option><option value="30d">30 days</option>
+              </select>
+              <Link href={`/ticker/${nextSymbol.toLowerCase()}`} aria-label="Open a random ticker"><Button variant="outline" className="h-9 rounded-[7px] border-[#2a3545] bg-[#0e1724] px-3 text-[#dce2eb] hover:bg-[#182232] hover:text-white"><Shuffle className="size-3.5" /></Button></Link>
             </div>
-            {intelligence.news.articles.length ? (
-              <div>
-                {intelligence.news.articles.map((article) => (
-                  <a key={article.id} href={article.articleUrl} target="_blank" rel="noreferrer" className="grid gap-3 border-b border-white/6 p-5 last:border-0 hover:bg-white/[.025] sm:grid-cols-[110px_minmax(0,1fr)_160px_90px] sm:items-center sm:px-6">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{article.publisher}</span>
-                    <span className="min-w-0">
-                      <strong className="block text-sm leading-6">{article.title}</strong>
-                      {article.reasoning && <small className="mt-1 block line-clamp-1 text-xs text-muted-foreground">{article.reasoning}</small>}
-                    </span>
-                    <span className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays className="size-3" /> {timeAgo(article.publishedAt, intelligence.news.calculatedAt)}</span>
-                    <span className={`text-xs font-bold capitalize ${article.sentiment === 'positive' ? 'text-primary' : article.sentiment === 'negative' ? 'text-destructive' : 'text-[#aebbc7]'}`}>{article.sentiment}</span>
-                  </a>
-                ))}
+          </header>
+
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div><h2 className="text-[20px] font-bold tracking-[-.03em]">{stock.name} ({stock.symbol})</h2><p className="mt-0.5 text-[13px] text-[#a7b1bf]">{intelligence.profile?.industry ?? stock.type} · {windowLabel[signalWindow]}</p></div>
+            <span className="w-fit rounded-full border border-[#2a3545] bg-[#111a28] px-3 py-1 text-[11px] text-[#b2bdca]">Live architecture, real data</span>
+          </div>
+
+          <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Market signals">
+            <SignalCard title="Company / Fundamental News" score={company.score} count={company.articles.length} positive={company.positive} neutral={company.neutral} negative={company.negative} />
+            <SignalCard title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} />
+            <SignalCard title="Industry / Macro News" score={macro.score} count={macro.articles.length} positive={macro.positive} neutral={macro.neutral} negative={macro.negative} />
+            <article className="min-h-[154px] rounded-[10px] border border-[#2a3545] bg-[#111a28] p-4">
+              <p className="text-[13px] font-bold text-[#e9edf4]">Crowd Sentiment</p>
+              <div className="mt-4 flex items-end gap-2"><strong className={`font-mono text-[34px] font-black leading-none tracking-[-.05em] ${tone(crowdScore)}`}>{signed(crowdScore, 1)}</strong><span className={`pb-0.5 text-[12px] font-semibold ${tone(crowdScore)}`}>{label(crowdScore)}</span></div>
+              <SignalMeter value={crowdScore} />
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <p className="text-[11px] text-[#a1adbc]">{(hot + not).toLocaleString()} responses</p>
+                <div className="flex gap-1.5">
+                  <button onClick={() => vote('not')} disabled={voteState === 'saving'} className={`rounded-[5px] border px-2 py-1 text-[10px] font-bold ${voteState === 'not' ? 'border-[#ff7f9f] bg-[#ff7f9f]/15 text-[#ff9bb4]' : 'border-[#344052] text-[#aeb8c6] hover:border-[#ff7f9f]'}`}>NOT</button>
+                  <button onClick={() => vote('hot')} disabled={voteState === 'saving'} className={`rounded-[5px] border px-2 py-1 text-[10px] font-bold ${voteState === 'hot' ? 'border-[#79e6ad] bg-[#79e6ad]/15 text-[#79e6ad]' : 'border-[#344052] text-[#aeb8c6] hover:border-[#79e6ad]'}`}>HOT</button>
+                </div>
               </div>
-            ) : (
-              <div className="p-10 text-center">
-                <Newspaper className="mx-auto size-6 text-muted-foreground" />
-                <p className="mt-3 font-bold">No scored headlines in this window</p>
-                <p className="mt-1 text-sm text-muted-foreground">Try a longer news window.</p>
-              </div>
-            )}
+              {voteError && <p className="mt-1 text-[10px] text-[#ff7f9f]">{voteError}</p>}
+            </article>
           </section>
 
-          <footer className="mt-5 flex flex-col gap-2 border-t border-white/8 py-6 text-xs leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <p>{intelligence.newsStale ? 'Cached news signal' : 'News sentiment supplied per ticker by Massive'} · recency-weighted by StockOrNot.</p>
-            <p>Sentiment is not investment advice or a forecast of returns.</p>
-          </footer>
+          <section className="mt-3 grid gap-3 xl:grid-cols-[1.08fr_.92fr]">
+            <article className="rounded-[10px] border border-[#2a3545] bg-[#111a28] p-4">
+              <p className="text-[13px] font-bold">Crowd vs. News Divergence</p>
+              <strong className={`mt-6 block font-mono text-[42px] font-black leading-none tracking-[-.05em] ${tone(divergence)}`}>{signed(divergence, 1)}</strong>
+              <p className="mt-3 text-[13px] leading-5 text-[#c1c9d4]">{divergenceCopy}</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-[7px] bg-[#172131] px-3 py-2"><p className="text-[10px] text-[#9ca9b8]">News composite</p><strong className="mt-0.5 block font-mono text-[17px]">{signed(intelligence.news.score, 1)}</strong></div>
+                <div className="rounded-[7px] bg-[#172131] px-3 py-2"><p className="text-[10px] text-[#9ca9b8]">Crowd</p><strong className="mt-0.5 block font-mono text-[17px]">{signed(crowdScore, 1)}</strong></div>
+              </div>
+            </article>
+
+            <article className="rounded-[10px] border border-[#2a3545] bg-[#111a28] p-4">
+              <p className="text-[13px] font-bold">Signal Architecture</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-[8px] border border-[#2b3646] p-3"><strong className="text-[14px] text-[#9db7ff]">NEWS</strong><p className="mt-1 text-[11px] leading-4 text-[#b8c2cf]">Ticker-specific reporting and publisher sentiment from Massive.</p></div>
+                <div className="rounded-[8px] border border-[#2b3646] p-3"><strong className="text-[14px] text-[#d4a9ff]">CROWD</strong><p className="mt-1 text-[11px] leading-4 text-[#b8c2cf]">Community Hot or Not votes, kept separate from news.</p></div>
+              </div>
+              <p className="mt-3 text-[11px] leading-4 text-[#a4afbd]">No vote affects the news score. News sentiment is recency-weighted and is not a price forecast.</p>
+            </article>
+          </section>
+
+          <section id="recent-information" className="mt-3 overflow-hidden rounded-[10px] border border-[#2a3545] bg-[#111a28]">
+            <div className="flex items-center justify-between border-b border-[#293443] px-4 py-3"><h2 className="text-[13px] font-bold">Recent Information</h2><div className="hidden gap-3 text-[10px] sm:flex"><span className="text-[#79e6ad]">● Positive</span><span className="text-[#b8c2cf]">● Neutral</span><span className="text-[#ff7f9f]">● Negative</span></div></div>
+            {intelligence.news.articles.length ? (
+              <div>{intelligence.news.articles.slice(0, 8).map((article) => (
+                <a key={article.id} href={article.articleUrl} target="_blank" rel="noreferrer" className="grid gap-2 border-b border-[#26303e] px-4 py-3 last:border-0 hover:bg-[#151f2e] sm:grid-cols-[82px_minmax(0,1fr)_150px_72px] sm:items-center">
+                  <span className="text-[10px] font-bold uppercase text-[#a6b1bf]">{classify(article)}</span>
+                  <span className="min-w-0"><strong className="block truncate text-[12px] font-semibold text-[#edf1f6]">{article.title}</strong><small className="mt-0.5 block text-[10px] text-[#8f9baa]">{relativeTime(article.publishedAt, intelligence.news.calculatedAt)}</small></span>
+                  <span className="truncate text-[10px] text-[#a5afbc]">{article.publisher}</span>
+                  <span className={`text-[10px] font-semibold capitalize ${article.sentiment === 'positive' ? 'text-[#79e6ad]' : article.sentiment === 'negative' ? 'text-[#ff7f9f]' : 'text-[#b8c2cf]'}`}>{article.sentiment}</span>
+                </a>
+              ))}</div>
+            ) : <p className="px-4 py-8 text-center text-[13px] text-[#9ca9b8]">No scored ticker-specific reporting in this window.</p>}
+          </section>
         </div>
-      </div>
+      </section>
     </main>
   );
 }
