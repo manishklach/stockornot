@@ -1,10 +1,8 @@
 'use client';
+/* oxlint-disable next/no-html-link-for-pages -- vinext's production Link runtime throws and breaks this interactive page. */
 
 import { useEffect, useState } from 'react';
-import type { SyntheticEvent } from 'react';
-import Link from 'next/link';
 import { Search, Shuffle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { NewsItem, SignalWindow, TickerIntelligence } from '@/lib/intelligence';
 import type { Stock } from '@/lib/stocks';
@@ -150,15 +148,6 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
     window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?window=${next}`);
   }
 
-  function submitSearch(event: SyntheticEvent<HTMLFormElement, SubmitEvent>) {
-    event.preventDefault();
-    const normalized = query.trim().toUpperCase();
-    if (!normalized) return;
-    const match = results.find((result) => result.symbol === normalized) ?? results[0];
-    const symbol = match?.symbol ?? (/^[A-Z][A-Z0-9.-]{0,9}$/.test(normalized) ? normalized : null);
-    if (symbol) window.location.assign(`/ticker/${symbol.toLowerCase()}`);
-  }
-
   async function vote(rating: 'hot' | 'not') {
     if (voteState === 'saving') return;
     setVoteState('saving');
@@ -183,15 +172,15 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
   return (
     <main className="min-h-screen bg-[#08111d] text-[#f4f6fb] lg:grid lg:grid-cols-[226px_minmax(0,1fr)]">
       <aside className="hidden min-h-screen border-r border-[#202a38] bg-[#09121e] px-5 py-5 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
-        <Link href="/" className="flex items-center gap-3">
+        <a href="/" className="flex items-center gap-3">
           <span className="grid size-9 place-items-center rounded-[9px] bg-[#8da8ff] text-sm font-black text-[#0a1320]">S</span>
           <span><strong className="block text-[15px] leading-5">StockOrNot</strong><small className="block text-[11px] text-[#9ca9b8]">Market information monitor</small></span>
-        </Link>
+        </a>
         <nav className="mt-8 space-y-1 text-[14px]" aria-label="Main navigation">
-          <Link href={`/ticker/${stock.symbol.toLowerCase()}`} className="block rounded-[7px] bg-[#182232] px-3 py-2.5 font-semibold">Dashboard</Link>
+          <a href={`/ticker/${stock.symbol.toLowerCase()}`} className="block rounded-[7px] bg-[#182232] px-3 py-2.5 font-semibold">Dashboard</a>
           <a href="#recent-information" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Sources</a>
-          <Link href="/methodology" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Methodology</Link>
-          <Link href="/leaderboard" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Leaderboard</Link>
+          <a href="/methodology" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Methodology</a>
+          <a href="/leaderboard" className="block rounded-[7px] px-3 py-2.5 text-[#c2cad6] hover:bg-[#121c29]">Leaderboard</a>
         </nav>
         <div className="mt-auto border-t border-[#26303e] pt-4 text-[11px] leading-4 text-[#9ca9b8]">
           <p className="font-semibold text-[#f0f3f8]">MVP</p>
@@ -204,9 +193,9 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
           <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-[11px] font-bold uppercase tracking-[.17em] text-[#9db7e8]">Market intelligence</p><h1 className="mt-1 text-[28px] font-bold leading-tight tracking-[-.04em]">Company Dashboard</h1></div>
             <div className="flex flex-wrap items-center gap-2">
-              <form className="relative" onSubmit={submitSearch}>
+              <form className="relative" action="/search" method="get">
                 <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#8997a8]" />
-                <Input value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={stock.symbol} aria-label="Search ticker or company" autoComplete="off" className="h-9 w-[138px] rounded-[7px] border-[#2a3545] bg-[#0e1724] pl-9 text-[13px] font-semibold" />
+                <Input name="q" value={query} onChange={(event) => updateQuery(event.target.value)} placeholder={stock.symbol} aria-label="Search ticker or company" autoComplete="off" className="h-9 w-[138px] rounded-[7px] border-[#2a3545] bg-[#0e1724] pl-9 text-[13px] font-semibold" />
                 <button type="submit" className="sr-only">Open ticker</button>
                 {query && (
                   <div className="absolute right-0 top-11 z-30 w-[300px] overflow-hidden rounded-[8px] border border-[#2a3545] bg-[#111a28] shadow-2xl">
@@ -221,7 +210,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
               <select value={signalWindow} onChange={(event) => changeWindow(event.target.value)} className="h-9 rounded-[7px] border border-[#2a3545] bg-[#0e1724] px-3 text-[13px] font-semibold outline-none focus:border-[#6d83bf]">
                 <option value="24h">24 hours</option><option value="7d">7 days</option><option value="30d">30 days</option>
               </select>
-              <Link href={`/ticker/${nextSymbol.toLowerCase()}`} aria-label="Open a random ticker"><Button variant="outline" className="h-9 rounded-[7px] border-[#2a3545] bg-[#0e1724] px-3 text-[#dce2eb] hover:bg-[#182232] hover:text-white"><Shuffle className="size-3.5" /></Button></Link>
+              <a href={`/ticker/${nextSymbol.toLowerCase()}`} aria-label="Open a random ticker" className="grid h-9 w-10 place-items-center rounded-[7px] border border-[#2a3545] bg-[#0e1724] text-[#dce2eb] hover:bg-[#182232] hover:text-white"><Shuffle className="size-3.5" /></a>
             </div>
           </header>
 
