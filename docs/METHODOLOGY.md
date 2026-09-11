@@ -2,13 +2,17 @@
 
 ## Crowd signal
 
-For an instrument with at least one vote:
+Windowed blended crowd for the selected 24h / 7d / 30d window:
 
 ```text
-Crowd = 100 × (Hot votes − Not votes) ÷ (Hot votes + Not votes)
+Crowd = 100 × ((organicHot + stBull) − (organicNot + stBear)) ÷ windowTotal
 ```
 
-The result ranges from −100 to +100 and is rounded to the nearest whole number. The crowd signal is hidden until after the visitor votes. Totals currently combine a deterministic launch baseline with live community votes, and the interface labels this explicitly.
+- `organicHot/Not` = D1 `votes` in the window (seed baseline excluded, shown separately)
+- `stBull/Bear` = StockTwits symbol stream (last 30 messages, same window, D1-cached 30m, stale fallback)
+- Result ranges −100 to +100 with one decimal. Null below 5 window signals or fewer than 2 per bucket (“Not enough data” / “Low sample”).
+- Confidence: `≥50 Established`, `≥10 Developing`, else `Limited`.
+- Lifetime leaderboard still ranks seed + all organic votes so new tickers sort sensibly; dashboards show the windowed blend.
 
 ## News signal
 
@@ -18,23 +22,25 @@ Massive supplies ticker-specific insight labels and reasoning for eligible artic
 News = 100 × Σ(sentiment × recency weight) ÷ Σ(recency weight)
 ```
 
-The recency weight decays exponentially, with a half-life equal to one third of the selected window and a minimum of 12 hours. Duplicate normalized titles are removed, and any single publisher contributes at most four articles. At least two eligible articles are required; otherwise the signal reports “Insufficient data.”
+The recency weight decays exponentially, with a half-life equal to one third of the selected window and a minimum of 12 hours. Duplicate normalized titles are removed, ticker publishers cap at four articles and macro publishers at three per window. Each bucket (Company / Stock-Forecast / Industry-Macro) requires at least two eligible articles; otherwise it reports “Not enough data” instead of an extreme ±100.
+
+Buckets split the same window: strong analyst signals (price target, upgrade/downgrade, estimate, rating, guidance, consensus, initiations, overweight/underweight) go to Stock; generic words (earnings, revenue, buy/sell/hold) only count as Stock with analyst context; market/industry keywords go to Macro; the rest is Company. Macro is enriched with an SPY/QQQ market proxy (Massive) plus a keyless GDELT industry feed — labeled MACRO, never feeding the ticker news composite.
 
 ## Divergence
 
 ```text
-Divergence = Crowd − News
+Divergence = windowed Crowd − ticker News composite
 ```
 
 Positive divergence means the crowd is more bullish than recent coverage; negative divergence means it is more bearish. Divergence is hidden with the crowd signal until after voting.
 
 ## Leaderboards
 
-- **Hottest** sorts scores from highest to lowest.
-- **Coldest** sorts scores from lowest to highest.
+- **Hottest** sorts lifetime scores from highest to lowest.
+- **Coldest** sorts lifetime scores from lowest to highest.
 - **Divisive** sorts by distance from 50%, with the closest scores first.
 
-The MVP combines seeded baseline totals with live community votes. The baseline makes the first-run experience useful before a community has accumulated. A production analytics surface should identify or separate seeded and organic votes.
+Lifetime totals combine seeded baseline with live community votes so first-run ranking is useful. Per-ticker dashboards separate seed from organic and show windowed blends with confidence.
 
 ## Bias reduction
 
@@ -48,13 +54,13 @@ The MVP uses:
 - A database uniqueness constraint per voter, ticker, and UTC day
 - Upsert behavior so a repeat daily submission changes a vote rather than adds one
 - Server-side symbol and rating validation
-- A basic recent-vote velocity check
+- A basic recent-vote velocity check (30/min)
 
 These controls discourage casual duplicate voting. They are not proof of personhood and do not stop determined attackers who rotate devices, cookies, or networks.
 
 ## Instrument and news data
 
-The database snapshot includes active US-locale instruments classified by Massive as common stock (`CS`) or exchange-traded fund (`ETF`); preferred shares, warrants, rights, bonds, ETNs, and other provider types are excluded. Company profiles and recent ticker-specific news also come from Massive. Profiles are cached for seven days and news for 30 minutes, with stale-cache fallback during temporary provider failures.
+The database snapshot includes active US-locale instruments classified by Massive as common stock (`CS`) or exchange-traded fund (`ETF`); preferred shares, warrants, rights, bonds, ETNs, and other provider types are excluded. Company profiles and recent ticker-specific news also come from Massive. Profiles are cached for seven days, news and macro for 30 minutes, and external crowd for 30 minutes, with stale-cache fallback during temporary provider failures.
 
 ## Interpretation
 

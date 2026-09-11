@@ -51,17 +51,17 @@ export default function MethodologyPage() {
             [
               Gauge,
               'Crowd signal',
-              'Hot and Not responses are normalized to a −100 to +100 scale. The MVP clearly labels that totals include a deterministic launch baseline.',
+              'Windowed organic Hot/Not votes plus StockTwits bull/bear for the same window, on a −100 to +100 scale. Seed baseline is shown separately and excluded from windowed scores. Minimum 5 signals and 2+ per bucket before a score renders, with Limited / Developing / Established confidence.',
             ],
             [
               Newspaper,
               'News signal',
-              'Massive supplies ticker-specific positive, neutral, or negative insights. StockOrNot deduplicates coverage, caps publisher concentration, and weights recent articles more heavily.',
+              'Massive supplies ticker-specific positive, neutral, or negative insights. Company, Stock/Forecast, and Industry/Macro buckets split the same window with recency weighting; macro is enriched with SPY/QQQ market proxy plus a GDELT industry feed and never feeds the news composite.',
             ],
             [
               ShieldCheck,
               'Basic vote integrity',
-              'An anonymous device cookie and daily uniqueness rule limit each device to one current vote per ticker per day.',
+              'An anonymous device cookie and daily uniqueness rule limit each device to one current vote per ticker per day, with a 30-votes-per-minute velocity guard.',
             ],
           ].map(([Icon, title, copy]) => {
             const I = Icon as typeof EyeOff;
@@ -83,15 +83,15 @@ export default function MethodologyPage() {
           <h2 className="text-2xl font-black">Signal calculation</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl bg-white/[.035] p-5">
-              <p className="font-mono text-sm text-primary">Crowd = 100 × (Hot − Not) ÷ total</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">A positive value means more Hot responses; a negative value means more Not responses.</p>
+              <p className="font-mono text-sm text-primary">Crowd = 100 × ((orgHot + stBull) − (orgNot + stBear)) ÷ windowTotal</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Organic window votes plus StockTwits bull/bear in the same 24h / 7d / 30d window. Seed baseline excluded. Null below 5 signals.</p>
             </div>
             <div className="rounded-2xl bg-white/[.035] p-5">
               <p className="font-mono text-sm text-[#83b8ff]">News = 100 × Σ(sentiment × recency weight) ÷ Σ(weight)</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">Positive is +1, neutral is 0, and negative is −1. At least two scored articles are required.</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">Positive is +1, neutral is 0, and negative is −1. At least two scored articles per bucket; otherwise “Not enough data”.</p>
             </div>
           </div>
-          <p className="mt-4 text-sm leading-7 text-muted-foreground">Divergence is Crowd minus News. Headlines with duplicate normalized titles are removed, and no publisher contributes more than four articles to a window.</p>
+          <p className="mt-4 text-sm leading-7 text-muted-foreground">Divergence is windowed Crowd minus ticker News composite. Headlines with duplicate normalized titles are removed; no ticker publisher contributes more than four articles and no macro publisher more than three per window.</p>
         </section>
         <section className="mt-12 border-t border-white/8 pt-10">
           <h2 className="text-2xl font-black">What the score is not</h2>
@@ -110,9 +110,12 @@ export default function MethodologyPage() {
           <h2 className="text-2xl font-black">Data and freshness</h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
             Company profiles and ticker-specific news come from Massive. Profiles
-            are cached for seven days and news signals for 30 minutes. If the
+            are cached for seven days and news signals for 30 minutes. Industry/Macro
+            adds an SPY/QQQ market proxy (Massive) plus a keyless GDELT industry feed,
+            cached 30 minutes. External crowd (StockTwits symbol stream, last 30 messages,
+            optional STOCKTWITS_TOKEN) is cached 30 minutes with stale fallback. If a
             provider is temporarily unavailable, StockOrNot uses the last cached
-            result when one exists and labels the signal as cached.
+            result when one exists and labels the signal as cached or stale.
           </p>
         </section>
         <section className="mt-10 rounded-2xl border border-primary/25 bg-primary/5 p-6">
