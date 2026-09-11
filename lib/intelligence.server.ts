@@ -65,12 +65,24 @@ function apiKey() {
   return env.MASSIVE_API_KEY || process.env.MASSIVE_API_KEY;
 }
 
-async function massiveJson<T>(url: string) {
+async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 4000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function massiveJson<T>(url: string, ms = 5000) {
   const key = apiKey();
   if (!key) throw new Error('Market intelligence is not configured.');
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${key}` },
-  });
+  const response = await fetchWithTimeout(
+    url,
+    { headers: { Authorization: `Bearer ${key}` } },
+    ms,
+  );
   const body = (await response.json()) as T & {
     error?: string;
     message?: string;
@@ -235,7 +247,7 @@ async function getNews(symbol: string, window: SignalWindow) {
     endpoint.searchParams.set('published_utc.gte', start);
     endpoint.searchParams.set('order', 'desc');
     endpoint.searchParams.set('sort', 'published_utc');
-    endpoint.searchParams.set('limit', '100');
+    endpoint.searchParams.set('limit', '60');
     const body = await massiveJson<{ results?: MassiveArticle[] }>(endpoint.toString());
     const signal = calculateNewsSignal(symbol, window, body.results ?? []);
     await writeCache(symbol, kind, signal);
@@ -315,11 +327,11 @@ async function fetchGdeltIndustry(industry: string | null, window: SignalWindow)
   const endpoint = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
   endpoint.searchParams.set('query', query);
   endpoint.searchParams.set('mode', 'artlist');
-  endpoint.searchParams.set('maxrecords', '20');
+  endpoint.searchParams.set('maxrecords', '10');
   endpoint.searchParams.set('format', 'json');
   endpoint.searchParams.set('sort', 'date');
   try {
-    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (macro research)' } });
+    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (macro research)' } }, 3500);
     if (!response.ok) return [];
     const body = (await response.json()) as { articles?: GdeltArticle[] };
     const items: NewsItem[] = [];
@@ -352,11 +364,11 @@ async function fetchGdeltCompany(symbol: string, window: SignalWindow): Promise<
   const endpoint = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
   endpoint.searchParams.set('query', `${symbol} stock`);
   endpoint.searchParams.set('mode', 'artlist');
-  endpoint.searchParams.set('maxrecords', '20');
+  endpoint.searchParams.set('maxrecords', '10');
   endpoint.searchParams.set('format', 'json');
   endpoint.searchParams.set('sort', 'date');
   try {
-    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } });
+    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } }, 3500);
     if (!response.ok) return [];
     const body = (await response.json()) as { articles?: GdeltArticle[] };
     const items: NewsItem[] = [];
@@ -406,12 +418,12 @@ async function fetchGoogleNewsRSS(symbol: string, window: SignalWindow): Promise
   endpoint.searchParams.set('gl', 'US');
   endpoint.searchParams.set('ceid', 'US:en');
   try {
-    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } });
+    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } }, 3500);
     if (!response.ok) return [];
     const xml = await response.text();
     const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
     const items: NewsItem[] = [];
-    for (const block of itemBlocks.slice(0, 20)) {
+    for (const block of itemBlocks.slice(0, 15)) {
       const titleRaw = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '';
       const linkRaw = block.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? '';
       const pubRaw = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? '';

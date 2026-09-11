@@ -79,7 +79,14 @@ async function fetchStockTwits(symbol: string, window: SignalWindow): Promise<Om
   const headers: Record<string, string> = { 'User-Agent': 'StockOrNot/0.5 (crowd research)' };
   const token = (env as unknown as Record<string, string | undefined>).STOCKTWITS_TOKEN ?? process.env.STOCKTWITS_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(endpoint, { headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3500);
+  let response: Response;
+  try {
+    response = await fetch(endpoint, { headers, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!response.ok) throw new Error(`StockTwits ${response.status}`);
   const body = (await response.json()) as { messages?: StockTwitsMessage[] };
   const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
@@ -121,13 +128,13 @@ export async function getExternalSentiment(symbol: string, window: SignalWindow)
 
 export async function getBlendedCrowd(symbol: string, window: SignalWindow): Promise<BlendedCrowd> {
   const normalized = symbol.toUpperCase();
-  const [{ seedHot, seedNot }, organicAll, external] = await Promise.all([
+  const sinceMs = Date.now() - WINDOW_HOURS[window] * 3_600_000;
+  const [{ seedHot, seedNot }, organicAll, organicWindow, external] = await Promise.all([
     getSeeds(normalized),
     countOrganic(normalized, null),
+    countOrganic(normalized, sinceMs),
     getExternalSentiment(normalized, window),
   ]);
-  const sinceMs = Date.now() - WINDOW_HOURS[window] * 3_600_000;
-  const organicWindow = await countOrganic(normalized, sinceMs);
 
   const breakdown: CrowdBreakdown = {
     symbol: normalized,
