@@ -77,6 +77,14 @@ const bucketMeta: Record<NewsBucket, { short: string; title: string }> = {
   macro: { short: 'MACRO', title: 'Industry / Macro News' },
 };
 
+function sourceWeight(article: NewsItem) {
+  // Keyword-heuristic extras (Google/GDELT feeds) count half vs Massive-scored insights,
+  // so neutral-heavy filler can't wash out real ticker sentiment.
+  const reasoning = article.reasoning ?? '';
+  if (/^\[(Google News|Company feed|Industry feed)]/.test(reasoning)) return 0.5;
+  return 1;
+}
+
 function bucketSignal(articles: NewsItem[], bucket: NewsBucket, signalWindow: SignalWindow, calculatedAt: number) {
   const selected = articles.filter((article) => classify(article) === bucket);
   const positive = selected.filter((a) => a.sentiment === 'positive').length;
@@ -91,7 +99,7 @@ function bucketSignal(articles: NewsItem[], bucket: NewsBucket, signalWindow: Si
   let weightedScore = 0;
   for (const article of selected) {
     const ageHours = Math.max(0, (calculatedAt - Date.parse(article.publishedAt)) / 3_600_000);
-    const weight = 2 ** (-ageHours / halfLifeHours);
+    const weight = 2 ** (-ageHours / halfLifeHours) * sourceWeight(article);
     const value = article.sentiment === 'positive' ? 1 : article.sentiment === 'negative' ? -1 : 0;
     weightedScore += value * weight;
     totalWeight += weight;

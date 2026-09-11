@@ -263,8 +263,8 @@ const MARKET_PROXIES = ['SPY', 'QQQ'] as const;
 
 function macroSentimentFromText(text: string): NewsSentiment {
   const lower = text.toLowerCase();
-  if (/(beat|record|rally|surge|jump|upgrade|raises? guidance|strong|growth|bull|optimis|rate cut|stimulus|breakthrough)/.test(lower)) return 'positive';
-  if (/(miss|plunge|slump|crash|downgrade|layoff|cut guidance|recession|inflation fears|tariff|probe|lawsuit|bear|warning|weak)/.test(lower)) return 'negative';
+  if (/(beat|beats|record|rally|rallies|surge|surges|jump|jumps|soar|soars|upgrade|raises? guidance|strong|strength|growth|grows|bull|optimis|rate cut|stimulus|breakthrough|approv|expan|launch|partnership|partnered|deal|profit|gains?|rises?|rising|climbs?|upbeat|confiden|rebound|recovers?|outperform|exceeds?|topped|wins?|awarded|contract|backlog|raised|raises|hikes?|accelerat)/.test(lower)) return 'positive';
+  if (/(miss|misses|plunge|slump|crash|downgrade|layoff|cut guidance|recession|inflation fears|tariff|probe|lawsuit|sued|bear|warning|warns|weak|falls?|falling|drops?|dropping|declines?|slips?|sinks?|tumbles?|disappoint|cuts?|delays?|halts?|fines?|penalt|investigat|fraud|bankrupt|default|fires?|firing|recall|shortfall|plummet|dives?|sinks?|loses?|losing|drag|fears?|risks?|cuts? jobs|plant closure)/.test(lower)) return 'negative';
   return 'neutral';
 }
 
