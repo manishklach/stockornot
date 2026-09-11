@@ -336,10 +336,102 @@ async function fetchGdeltIndustry(industry: string | null, window: SignalWindow)
         publishedAt: new Date(publishedAt).toISOString(),
         summary: null,
         sentiment: macroSentimentFromText(text),
-        reasoning: `[Industry feed] Matches "${industry}". Keyword heuristic, not ticker-specific.`,
+        reasoning: `[Industry feed] Matches industry. Keyword heuristic, not ticker-specific.`,
         sourceGroup: 'macro',
       });
       if (items.length >= 8) break;
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchGdeltCompany(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+  const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
+  const endpoint = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  endpoint.searchParams.set('query', `${symbol} stock`);
+  endpoint.searchParams.set('mode', 'artlist');
+  endpoint.searchParams.set('maxrecords', '20');
+  endpoint.searchParams.set('format', 'json');
+  endpoint.searchParams.set('sort', 'date');
+  try {
+    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { articles?: GdeltArticle[] };
+    const items: NewsItem[] = [];
+    for (const article of body.articles ?? []) {
+      const publishedAt = parseGdeltDate(article.seendate);
+      const articleUrl = safeExternalUrl(article.url);
+      if (!article.title || !articleUrl || !Number.isFinite(publishedAt) || publishedAt < cutoff) continue;
+      // Skip market-proxy duplicates that belong in Macro.
+      if (/s&p|nasdaq|dow jones|federal reserve|rate cut|rate hike/i.test(article.title)) continue;
+      const text = article.title;
+      items.push({
+        id: `ticker-gdelt-${symbol}-${publishedAt}-${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48)}`,
+        title: text,
+        articleUrl,
+        publisher: article.domain?.trim() || 'GDELT company feed',
+        publishedAt: new Date(publishedAt).toISOString(),
+        summary: null,
+        sentiment: macroSentimentFromText(text),
+        reasoning: `[Company feed] Matches ${symbol}. Keyword heuristic.`,
+        sourceGroup: 'ticker',
+      });
+      if (items.length >= 8) break;
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+function decodeXmlEntities(value: string) {
+  return value
+    .split('<![CDATA[').join('')
+    .split(']]>').join('')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+async function fetchGoogleNewsRSS(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+  const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
+  const endpoint = new URL('https://news.google.com/rss/search');
+  endpoint.searchParams.set('q', `${symbol} stock`);
+  endpoint.searchParams.set('hl', 'en-US');
+  endpoint.searchParams.set('gl', 'US');
+  endpoint.searchParams.set('ceid', 'US:en');
+  try {
+    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } });
+    if (!response.ok) return [];
+    const xml = await response.text();
+    const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
+    const items: NewsItem[] = [];
+    for (const block of itemBlocks.slice(0, 20)) {
+      const titleRaw = block.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? '';
+      const linkRaw = block.match(/<link>([\s\S]*?)<\/link>/)?.[1] ?? '';
+      const pubRaw = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] ?? '';
+      const sourceRaw = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1] ?? '';
+      const title = decodeXmlEntities(titleRaw).split(' - ').slice(0, -1).join(' - ') || decodeXmlEntities(titleRaw);
+      const articleUrl = safeExternalUrl(decodeXmlEntities(linkRaw));
+      const publishedAt = Date.parse(pubRaw);
+      if (!title || !articleUrl || !Number.isFinite(publishedAt) || publishedAt < cutoff) continue;
+      items.push({
+        id: `ticker-gnews-${symbol}-${publishedAt}-${title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48)}`,
+        title,
+        articleUrl,
+        publisher: decodeXmlEntities(sourceRaw) || 'Google News',
+        publishedAt: new Date(publishedAt).toISOString(),
+        summary: null,
+        sentiment: macroSentimentFromText(title),
+        reasoning: `[Google News] Matches ${symbol}. Keyword heuristic.`,
+        sourceGroup: 'ticker',
+      });
+      if (items.length >= 10) break;
     }
     return items;
   } catch {
@@ -353,14 +445,17 @@ async function getMacroExtras(symbol: string, industry: string | null, window: S
   if (cached && Date.now() - cached.fetchedAt < MACRO_TTL)
     return { value: cached.value, stale: false };
   try {
-    const [proxy, gdelt] = await Promise.all([
+    const [proxy, gdeltIndustry, gdeltCompany, gnews] = await Promise.all([
       fetchMarketProxy(symbol, window),
       fetchGdeltIndustry(industry, window),
+      fetchGdeltCompany(symbol, window),
+      fetchGoogleNewsRSS(symbol, window),
     ]);
     const seen = new Set<string>();
     const publisherCounts = new Map<string, number>();
     const merged: NewsItem[] = [];
-    for (const item of [...proxy, ...gdelt]) {
+    // Order: ticker-specific company feeds first so Company/Stock buckets fill, then macro.
+    for (const item of [...gnews, ...gdeltCompany, ...proxy, ...gdeltIndustry]) {
       const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       if (seen.has(key)) continue;
       const count = publisherCounts.get(item.publisher) ?? 0;
@@ -368,7 +463,7 @@ async function getMacroExtras(symbol: string, industry: string | null, window: S
       seen.add(key);
       publisherCounts.set(item.publisher, count + 1);
       merged.push(item);
-      if (merged.length >= 10) break;
+      if (merged.length >= 18) break;
     }
     merged.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
     await writeCache(symbol, kind, merged);

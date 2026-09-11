@@ -203,9 +203,12 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
     };
   }, [query]);
 
-  const company = bucketSignal(intelligence.news.articles, 'company', signalWindow, intelligence.news.calculatedAt);
-  const stockNews = bucketSignal(intelligence.news.articles, 'stock', signalWindow, intelligence.news.calculatedAt);
-  const macroPool = [...intelligence.news.articles, ...(intelligence.macroExtras ?? [])];
+  const extras = intelligence.macroExtras ?? [];
+  const tickerExtras = extras.filter((a) => a.sourceGroup === 'ticker');
+  const tickerPool = [...intelligence.news.articles, ...tickerExtras];
+  const company = bucketSignal(tickerPool, 'company', signalWindow, intelligence.news.calculatedAt);
+  const stockNews = bucketSignal(tickerPool, 'stock', signalWindow, intelligence.news.calculatedAt);
+  const macroPool = [...intelligence.news.articles, ...extras.filter((a) => a.sourceGroup !== 'ticker')];
   const macro = bucketSignal(macroPool, 'macro', signalWindow, intelligence.news.calculatedAt);
   const totalVotes = hot + not;
   const lifetimeCrowdScore = totalVotes ? ((hot - not) / totalVotes) * 100 : 0;
@@ -526,7 +529,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
               <p className="px-5 py-10 text-center text-[13px] text-[#8b96a5]">No scored ticker-specific reporting in this window. Try 7 days or 30 days.</p>
             )}
             <p className="border-t border-[#243044] bg-[#0c1522] px-5 py-2.5 text-[10.5px] leading-4 text-[#5c6878]">
-              Ticker news from Massive (publisher cap 4, recency-weighted). Macro adds SPY/QQQ market proxy + GDELT industry feed — labeled MACRO, never feeds the news composite.
+              Ticker news from Massive (publisher cap 4, recency-weighted) + Google News RSS + GDELT company feed for thin names. Macro adds SPY/QQQ market proxy + GDELT industry feed — labeled MACRO, never feeds the news composite.
             </p>
           </section>
 
