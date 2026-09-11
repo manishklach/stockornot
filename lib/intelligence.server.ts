@@ -268,7 +268,25 @@ function macroSentimentFromText(text: string): NewsSentiment {
   return 'neutral';
 }
 
+function cleanIndustryQuery(industry: string | null): string | null {
+  if (!industry) return null;
+  const cleaned = industry
+    .replace(/services-/gi, '')
+    .replace(/&\s*related devices/gi, '')
+    .replace(/,?\s*data processing,?\s*etc\.?/gi, '')
+    .replace(/[^a-z0-9\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const words = cleaned.split(' ').filter((w) => w.length > 2 && !/^(and|the|for|with|etc)$/i.test(w));
+  if (!words.length) return null;
+  return words.slice(0, 2).join(' ');
+}
+
 async function fetchMarketProxy(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+  // Shared across tickers: one D1 row warms SPY/QQQ for every dashboard, avoiding per-ticker Massive fan-out.
+  const shared = await readCache<NewsItem[]>('__MARKET__', `proxy:${window}`);
+  if (shared && Date.now() - shared.fetchedAt < MACRO_TTL && shared.value.length > 0)
+    return shared.value;
   const start = new Date(Date.now() - WINDOW_HOURS[window] * 3_600_000).toISOString();
   const cutoff = Date.parse(start);
   const items: NewsItem[] = [];
@@ -304,6 +322,7 @@ async function fetchMarketProxy(symbol: string, window: SignalWindow): Promise<N
     }
     if (items.length >= 8) break;
   }
+  if (items.length > 0) await writeCache('__MARKET__', `proxy:${window}`, items);
   void symbol;
   return items;
 }
@@ -322,9 +341,10 @@ function parseGdeltDate(value?: string): number {
 }
 
 async function fetchGdeltIndustry(industry: string | null, window: SignalWindow): Promise<NewsItem[]> {
-  if (!industry) return [];
+  const queryCore = cleanIndustryQuery(industry);
+  if (!queryCore) return [];
   const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
-  const query = `${industry} stocks market`;
+  const query = `${queryCore} stocks market`;
   const endpoint = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
   endpoint.searchParams.set('query', query);
   endpoint.searchParams.set('mode', 'artlist');
