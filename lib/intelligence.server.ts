@@ -352,7 +352,7 @@ async function fetchGdeltIndustry(industry: string | null, window: SignalWindow)
   endpoint.searchParams.set('format', 'json');
   endpoint.searchParams.set('sort', 'date');
   try {
-    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (macro research)' } }, 3500);
+    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (macro research)' } }, 6000);
     if (!response.ok) return [];
     const body = (await response.json()) as { articles?: GdeltArticle[] };
     const items: NewsItem[] = [];
@@ -389,7 +389,7 @@ async function fetchGdeltCompany(symbol: string, window: SignalWindow): Promise<
   endpoint.searchParams.set('format', 'json');
   endpoint.searchParams.set('sort', 'date');
   try {
-    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } }, 3500);
+    const response = await fetchWithTimeout(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (company research)' } }, 6000);
     if (!response.ok) return [];
     const body = (await response.json()) as { articles?: GdeltArticle[] };
     const items: NewsItem[] = [];
@@ -431,10 +431,10 @@ function decodeXmlEntities(value: string) {
     .trim();
 }
 
-async function fetchGoogleNewsRSS(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+async function fetchGoogleNews(query: string, idPrefix: string, reasoningPrefix: string, sourceGroup: 'ticker' | 'macro', cap: number, symbol: string, window: SignalWindow): Promise<NewsItem[]> {
   const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
   const endpoint = new URL('https://news.google.com/rss/search');
-  endpoint.searchParams.set('q', `${symbol} stock`);
+  endpoint.searchParams.set('q', query);
   endpoint.searchParams.set('hl', 'en-US');
   endpoint.searchParams.set('gl', 'US');
   endpoint.searchParams.set('ceid', 'US:en');
@@ -454,22 +454,30 @@ async function fetchGoogleNewsRSS(symbol: string, window: SignalWindow): Promise
       const publishedAt = Date.parse(pubRaw);
       if (!title || !articleUrl || !Number.isFinite(publishedAt) || publishedAt < cutoff) continue;
       items.push({
-        id: `ticker-gnews-${symbol}-${publishedAt}-${title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48)}`,
+        id: `${idPrefix}-${symbol}-${publishedAt}-${title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48)}`,
         title,
         articleUrl,
         publisher: decodeXmlEntities(sourceRaw) || 'Google News',
         publishedAt: new Date(publishedAt).toISOString(),
         summary: null,
         sentiment: macroSentimentFromText(title),
-        reasoning: `[Google News] Matches ${symbol}. Keyword heuristic.`,
-        sourceGroup: 'ticker',
+        reasoning: `${reasoningPrefix} Keyword heuristic.`,
+        sourceGroup,
       });
-      if (items.length >= 10) break;
+      if (items.length >= cap) break;
     }
     return items;
   } catch {
     return [];
   }
+}
+
+async function fetchGoogleNewsRSS(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+  return fetchGoogleNews(`${symbol} stock`, 'ticker-gnews', `[Google News] Matches ${symbol}.`, 'ticker', 10, symbol, window);
+}
+
+async function fetchGoogleNewsMacro(window: SignalWindow): Promise<NewsItem[]> {
+  return fetchGoogleNews('stock market today', 'macro-gnews', '[Google News market] Broad market tone.', 'macro', 6, 'MARKET', window);
 }
 
 async function getMacroExtras(symbol: string, industry: string | null, window: SignalWindow) {
@@ -478,17 +486,18 @@ async function getMacroExtras(symbol: string, industry: string | null, window: S
   if (cached && Date.now() - cached.fetchedAt < MACRO_TTL)
     return { value: cached.value, stale: false };
   try {
-    const [proxy, gdeltIndustry, gdeltCompany, gnews] = await Promise.all([
+    const [proxy, gdeltIndustry, gdeltCompany, gnews, gnewsMacro] = await Promise.all([
       fetchMarketProxy(symbol, window),
       fetchGdeltIndustry(industry, window),
       fetchGdeltCompany(symbol, window),
       fetchGoogleNewsRSS(symbol, window),
+      fetchGoogleNewsMacro(window),
     ]);
     const seen = new Set<string>();
     const publisherCounts = new Map<string, number>();
     const merged: NewsItem[] = [];
     // Order: ticker-specific company feeds first so Company/Stock buckets fill, then macro.
-    for (const item of [...gnews, ...gdeltCompany, ...proxy, ...gdeltIndustry]) {
+    for (const item of [...gnews, ...gdeltCompany, ...proxy, ...gnewsMacro, ...gdeltIndustry]) {
       const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       if (seen.has(key)) continue;
       const count = publisherCounts.get(item.publisher) ?? 0;
