@@ -75,7 +75,7 @@ async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 4000) 
   }
 }
 
-async function massiveJson<T>(url: string, ms = 5000) {
+async function massiveJson<T>(url: string, ms = 8000) {
   const key = apiKey();
   if (!key) throw new Error('Market intelligence is not configured.');
   const response = await fetchWithTimeout(
@@ -250,8 +250,9 @@ async function getNews(symbol: string, window: SignalWindow) {
     endpoint.searchParams.set('limit', '60');
     const body = await massiveJson<{ results?: MassiveArticle[] }>(endpoint.toString());
     const signal = calculateNewsSignal(symbol, window, body.results ?? []);
-    await writeCache(symbol, kind, signal);
-    return { value: signal, stale: false };
+    // Don't poison cache with transient empties — retry next load. Real thin names just refetch cheaply.
+    if (signal.total > 0) await writeCache(symbol, kind, signal);
+    return { value: signal.total > 0 ? signal : (cached?.value ?? signal), stale: signal.total > 0 ? false : Boolean(cached) };
   } catch {
     return { value: cached?.value ?? emptySignal(), stale: Boolean(cached) };
   }
@@ -478,7 +479,8 @@ async function getMacroExtras(symbol: string, industry: string | null, window: S
       if (merged.length >= 18) break;
     }
     merged.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-    await writeCache(symbol, kind, merged);
+    // Don't poison the 30m cache with a transient empty — retry next load.
+    if (merged.length > 0) await writeCache(symbol, kind, merged);
     return { value: merged, stale: false };
   } catch {
     return { value: cached?.value ?? [], stale: Boolean(cached) };

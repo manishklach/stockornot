@@ -348,8 +348,13 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[#2a3545] bg-[#111a28] px-3 py-1 text-[11px] text-[#aeb9c7]">
-                {intelligence.news.coverage} coverage · {intelligence.news.sourceCount} {intelligence.news.sourceCount === 1 ? 'source' : 'sources'}
-                {intelligence.newsStale ? ' · stale' : ''}
+                {(() => {
+                  const extraPublishers = new Set((intelligence.macroExtras ?? []).map((a) => a.publisher)).size;
+                  const totalSources = intelligence.news.sourceCount + extraPublishers;
+                  const totalItems = intelligence.news.total + (intelligence.macroExtras ?? []).length;
+                  const coverage = totalItems >= 8 ? 'Established' : totalItems >= 3 ? 'Developing' : 'Limited';
+                  return `${coverage} coverage · ${totalSources} ${totalSources === 1 ? 'source' : 'sources'}${intelligence.newsStale || intelligence.macroStale ? ' · stale' : ''}`;
+                })()}
               </span>
               <span className="rounded-full border border-[#2a3545] bg-[#111a28] px-3 py-1 text-[11px] text-[#aeb9c7]">Live architecture, real data</span>
             </div>
@@ -358,7 +363,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
           {/* 4 signal cards */}
           <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Market signals">
             <SignalCard icon={Building2} title="Company / Fundamental News" score={company.score} count={company.articles.length} positive={company.positive} neutral={company.neutral} negative={company.negative} />
-            <SignalCard icon={ChartLine} title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} emptyHint={stockNews.articles.length === 0 ? `No analyst or forecast items for ${stock.symbol} in ${windowLabel[signalWindow].toLowerCase()} — small caps often have thin coverage. Try 30 days.` : undefined} />
+            <SignalCard icon={ChartLine} title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} emptyHint={stockNews.articles.length === 0 ? `No analyst or forecast items for ${stock.symbol} in ${windowLabel[signalWindow].toLowerCase()}. Try 30 days.` : undefined} />
             <SignalCard icon={Factory} title="Industry / Macro News" score={macro.score} count={macro.articles.length} positive={macro.positive} neutral={macro.neutral} negative={macro.negative} emptyHint={macro.articles.length === 0 ? 'No macro items in this window.' : undefined} />
             <article className="flex min-h-[168px] flex-col rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
               <div className="flex items-center justify-between gap-2">
