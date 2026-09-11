@@ -260,7 +260,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
         <a href="/" className="flex items-center gap-3">
           <span className="grid size-9 place-items-center rounded-[9px] bg-[#8da8ff] text-sm font-black text-[#0a1320]">S</span>
           <span>
-            <strong className="block text-[15px] leading-5 font-bold">SignalScope</strong>
+            <strong className="block text-[15px] leading-5 font-bold">StockOrNot</strong>
             <small className="block text-[11px] text-[#8b96a5]">Market information monitor</small>
           </span>
         </a>
