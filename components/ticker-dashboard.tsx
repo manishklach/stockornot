@@ -370,7 +370,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
               </div>
               <p className="mt-1 text-[10.5px] leading-4 text-[#5c6878]">
                 {crowd
-                  ? `${organicTotal.toLocaleString()} organic votes (${crowd.breakdown.organicWindowHot + (external?.bull ?? 0)} hot / ${crowd.breakdown.organicWindowNot + (external?.bear ?? 0)} not in window)${external ? ` + ${external.messageCount} StockTwits msgs${external.stale ? ' (stale)' : ''}` : ''} · ${seedTotal.toLocaleString()} seed baseline excluded`
+                  ? `${organicTotal.toLocaleString()} organic votes lifetime · ${crowd.breakdown.organicWindowHot}/${crowd.breakdown.organicWindowNot} hot/not in window${external ? ` + StockTwits ${external.bull}/${external.bear} bull/bear (${external.messageCount} msgs${external.stale ? ', stale' : ''})` : ' + no external crowd yet'} · ${seedTotal.toLocaleString()} seed excluded`
                   : `${totalVotes.toLocaleString()} responses · ${hot.toLocaleString()} hot · ${not.toLocaleString()} not`}
               </p>
               <div className="mt-2 flex gap-2">
