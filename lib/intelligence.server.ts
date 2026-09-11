@@ -174,6 +174,7 @@ function calculateNewsSignal(
       summary: article.description ?? null,
       sentiment: insight.sentiment,
       reasoning: insight.sentiment_reasoning ?? null,
+      sourceGroup: 'ticker',
     });
   }
 
@@ -244,19 +245,155 @@ async function getNews(symbol: string, window: SignalWindow) {
   }
 }
 
+const MACRO_TTL = 30 * 60 * 1000;
+const MARKET_PROXIES = ['SPY', 'QQQ'] as const;
+
+function macroSentimentFromText(text: string): NewsSentiment {
+  const lower = text.toLowerCase();
+  if (/(beat|record|rally|surge|jump|upgrade|raises? guidance|strong|growth|bull|optimis|rate cut|stimulus|breakthrough)/.test(lower)) return 'positive';
+  if (/(miss|plunge|slump|crash|downgrade|layoff|cut guidance|recession|inflation fears|tariff|probe|lawsuit|bear|warning|weak)/.test(lower)) return 'negative';
+  return 'neutral';
+}
+
+async function fetchMarketProxy(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
+  const start = new Date(Date.now() - WINDOW_HOURS[window] * 3_600_000).toISOString();
+  const cutoff = Date.parse(start);
+  const items: NewsItem[] = [];
+  for (const proxy of MARKET_PROXIES) {
+    try {
+      const endpoint = new URL('https://api.massive.com/v2/reference/news');
+      endpoint.searchParams.set('ticker', proxy);
+      endpoint.searchParams.set('published_utc.gte', start);
+      endpoint.searchParams.set('order', 'desc');
+      endpoint.searchParams.set('sort', 'published_utc');
+      endpoint.searchParams.set('limit', '12');
+      const body = await massiveJson<{ results?: MassiveArticle[] }>(endpoint.toString());
+      for (const article of body.results ?? []) {
+        const publishedAt = Date.parse(article.published_utc ?? '');
+        const insight = article.insights?.find((item) => item.ticker?.toUpperCase() === proxy);
+        const articleUrl = safeExternalUrl(article.article_url);
+        if (!article.title || !articleUrl || !Number.isFinite(publishedAt) || publishedAt < cutoff || !insight?.sentiment) continue;
+        items.push({
+          id: `macro-${proxy}-${article.id ?? publishedAt}`,
+          title: article.title,
+          articleUrl,
+          publisher: article.publisher?.name?.trim() || 'Market proxy',
+          publishedAt: new Date(publishedAt).toISOString(),
+          summary: article.description ?? null,
+          sentiment: insight.sentiment,
+          reasoning: `[Market proxy ${proxy}] ${insight.sentiment_reasoning ?? 'Broad market tone.'}`,
+          sourceGroup: 'macro',
+        });
+        if (items.length >= 8) break;
+      }
+    } catch {
+      /* one proxy failing should not kill macro */
+    }
+    if (items.length >= 8) break;
+  }
+  void symbol;
+  return items;
+}
+
+type GdeltArticle = { title?: string; url?: string; domain?: string; seendate?: string };
+
+function parseGdeltDate(value?: string): number {
+  if (!value) return Number.NaN;
+  // GDELT seendate looks like 20260908T143000Z
+  const match = value.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
+  if (match) {
+    const [, y, mo, d, h, mi, s] = match;
+    return Date.parse(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`);
+  }
+  return Date.parse(value);
+}
+
+async function fetchGdeltIndustry(industry: string | null, window: SignalWindow): Promise<NewsItem[]> {
+  if (!industry) return [];
+  const cutoff = Date.now() - WINDOW_HOURS[window] * 3_600_000;
+  const query = `${industry} stocks market`;
+  const endpoint = new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  endpoint.searchParams.set('query', query);
+  endpoint.searchParams.set('mode', 'artlist');
+  endpoint.searchParams.set('maxrecords', '20');
+  endpoint.searchParams.set('format', 'json');
+  endpoint.searchParams.set('sort', 'date');
+  try {
+    const response = await fetch(endpoint.toString(), { headers: { 'User-Agent': 'StockOrNot/0.5 (macro research)' } });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { articles?: GdeltArticle[] };
+    const items: NewsItem[] = [];
+    for (const article of body.articles ?? []) {
+      const publishedAt = parseGdeltDate(article.seendate);
+      const articleUrl = safeExternalUrl(article.url);
+      if (!article.title || !articleUrl || !Number.isFinite(publishedAt) || publishedAt < cutoff) continue;
+      const text = article.title;
+      items.push({
+        id: `macro-gdelt-${publishedAt}-${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48)}`,
+        title: text,
+        articleUrl,
+        publisher: article.domain?.trim() || 'GDELT industry feed',
+        publishedAt: new Date(publishedAt).toISOString(),
+        summary: null,
+        sentiment: macroSentimentFromText(text),
+        reasoning: `[Industry feed] Matches "${industry}". Keyword heuristic, not ticker-specific.`,
+        sourceGroup: 'macro',
+      });
+      if (items.length >= 8) break;
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+async function getMacroExtras(symbol: string, industry: string | null, window: SignalWindow) {
+  const kind = `macro:${window}`;
+  const cached = await readCache<NewsItem[]>(symbol, kind);
+  if (cached && Date.now() - cached.fetchedAt < MACRO_TTL)
+    return { value: cached.value, stale: false };
+  try {
+    const [proxy, gdelt] = await Promise.all([
+      fetchMarketProxy(symbol, window),
+      fetchGdeltIndustry(industry, window),
+    ]);
+    const seen = new Set<string>();
+    const publisherCounts = new Map<string, number>();
+    const merged: NewsItem[] = [];
+    for (const item of [...proxy, ...gdelt]) {
+      const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (seen.has(key)) continue;
+      const count = publisherCounts.get(item.publisher) ?? 0;
+      if (count >= 3) continue;
+      seen.add(key);
+      publisherCounts.set(item.publisher, count + 1);
+      merged.push(item);
+      if (merged.length >= 10) break;
+    }
+    merged.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+    await writeCache(symbol, kind, merged);
+    return { value: merged, stale: false };
+  } catch {
+    return { value: cached?.value ?? [], stale: Boolean(cached) };
+  }
+}
+
 export async function getTickerIntelligence(
   symbol: string,
   window: SignalWindow,
 ): Promise<TickerIntelligence> {
   const normalized = symbol.toUpperCase();
-  const [profile, news] = await Promise.all([
-    getProfile(normalized),
+  const profile = await getProfile(normalized);
+  const [news, macro] = await Promise.all([
     getNews(normalized, window),
+    getMacroExtras(normalized, profile.value?.industry ?? null, window),
   ]);
   return {
     profile: profile.value,
     news: news.value,
+    macroExtras: macro.value,
     profileStale: profile.stale,
     newsStale: news.stale,
+    macroStale: macro.stale,
   };
 }

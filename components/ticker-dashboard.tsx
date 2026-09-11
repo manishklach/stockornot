@@ -63,9 +63,10 @@ function barColor(value: number | null) {
 }
 
 function classify(article: NewsItem): NewsBucket {
+  if (article.sourceGroup === 'macro') return 'macro';
   const text = `${article.title} ${article.reasoning ?? ''}`.toLowerCase();
-  if (/analyst|price target|upgrade|downgrade|forecast|estimate|rating|outlook|guidance|earnings call/.test(text)) return 'stock';
-  if (/federal reserve|interest rate|inflation|economy|economic|industry|sector|tariff|regulation|macro|market-wide|supply chain|semiconductor industry|chip/.test(text)) return 'macro';
+  if (/analyst|price target|upgrade|downgrade|forecast|estimate|rating|outlook|guidance|earnings call|price target raised|price target cut/.test(text)) return 'stock';
+  if (/federal reserve|fed |interest rate|rate cut|rate hike|inflation|economy|economic|industry|sector|tariff|regulation|macro|market-wide|supply chain|semiconductor|chip|software|cloud|dow jones|s&p|nasdaq|wall street|market rally|market sell/.test(text)) return 'macro';
   return 'company';
 }
 
@@ -195,7 +196,8 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
 
   const company = bucketSignal(intelligence.news.articles, 'company', signalWindow, intelligence.news.calculatedAt);
   const stockNews = bucketSignal(intelligence.news.articles, 'stock', signalWindow, intelligence.news.calculatedAt);
-  const macro = bucketSignal(intelligence.news.articles, 'macro', signalWindow, intelligence.news.calculatedAt);
+  const macroPool = [...intelligence.news.articles, ...(intelligence.macroExtras ?? [])];
+  const macro = bucketSignal(macroPool, 'macro', signalWindow, intelligence.news.calculatedAt);
   const totalVotes = hot + not;
   const lifetimeCrowdScore = totalVotes ? ((hot - not) / totalVotes) * 100 : 0;
   // Prefer windowed blended crowd (organic window votes + StockTwits) when available.
@@ -466,7 +468,8 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
               <div className="flex items-center gap-3">
                 <h2 className="text-[13px] font-bold text-white">Recent Information</h2>
                 <span className="hidden rounded-full bg-[#172131] px-2.5 py-0.5 text-[10.5px] text-[#8f9baa] sm:inline-block">
-                  {intelligence.news.articles.length} shown · {windowLabel[signalWindow].toLowerCase()}
+                  {intelligence.news.articles.length + (intelligence.macroExtras?.length ?? 0)} shown · {windowLabel[signalWindow].toLowerCase()}
+                  {intelligence.macroStale ? ' · macro stale' : ''}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-[10.5px] font-medium">
@@ -475,9 +478,11 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
                 <span className="inline-flex items-center gap-1.5 text-[#ff8fa3]"><span className="size-1.5 rounded-full bg-[#ff8fa3]" /> Negative</span>
               </div>
             </div>
-            {intelligence.news.articles.length ? (
+            {intelligence.news.articles.length || (intelligence.macroExtras?.length ?? 0) ? (
               <ul>
-                {intelligence.news.articles.slice(0, 10).map((article) => {
+                {[...intelligence.news.articles, ...(intelligence.macroExtras ?? [])]
+                  .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+                  .slice(0, 14).map((article) => {
                   const bucket = classify(article);
                   const tier = publisherTier(article.publisher);
                   return (
@@ -512,7 +517,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
               <p className="px-5 py-10 text-center text-[13px] text-[#8b96a5]">No scored ticker-specific reporting in this window. Try 7 days or 30 days.</p>
             )}
             <p className="border-t border-[#243044] bg-[#0c1522] px-5 py-2.5 text-[10.5px] leading-4 text-[#5c6878]">
-              Publisher tiers reward primary-source reporting. Scores use exponential recency weighting and cap each publisher at 4 items per window.
+              Ticker news from Massive (publisher cap 4, recency-weighted). Macro adds SPY/QQQ market proxy + GDELT industry feed — labeled MACRO, never feeds the news composite.
             </p>
           </section>
 

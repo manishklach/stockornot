@@ -21,6 +21,7 @@ export type NewsItem = {
   summary: string | null;
   sentiment: NewsSentiment;
   reasoning: string | null;
+  sourceGroup?: 'ticker' | 'macro';
 };
 
 export type NewsSignal = {
@@ -39,6 +40,8 @@ export type NewsSignal = {
 export type TickerIntelligence = {
   profile: TickerProfile | null;
   news: NewsSignal;
+  macroExtras: NewsItem[];
   profileStale: boolean;
   newsStale: boolean;
+  macroStale: boolean;
 };
