@@ -219,7 +219,7 @@ function calculateNewsSignal(
     sourceCount: publisherCounts.size,
     coverage: articles.length >= 8 ? 'Established' : articles.length >= 3 ? 'Developing' : 'Limited',
     calculatedAt: now,
-    articles: articles.slice(0, 12),
+    articles: articles.slice(0, 20),
   };
 }
 
@@ -235,7 +235,7 @@ async function getNews(symbol: string, window: SignalWindow) {
     endpoint.searchParams.set('published_utc.gte', start);
     endpoint.searchParams.set('order', 'desc');
     endpoint.searchParams.set('sort', 'published_utc');
-    endpoint.searchParams.set('limit', '50');
+    endpoint.searchParams.set('limit', '100');
     const body = await massiveJson<{ results?: MassiveArticle[] }>(endpoint.toString());
     const signal = calculateNewsSignal(symbol, window, body.results ?? []);
     await writeCache(symbol, kind, signal);

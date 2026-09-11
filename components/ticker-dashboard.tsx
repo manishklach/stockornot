@@ -65,12 +65,8 @@ function barColor(value: number | null) {
 function classify(article: NewsItem): NewsBucket {
   if (article.sourceGroup === 'macro') return 'macro';
   const text = `${article.title} ${article.reasoning ?? ''} ${article.summary ?? ''}`.toLowerCase();
-  // Strong analyst/forecast signals always go to Stock.
+  // Stock = pure analyst/forecast actions. Earnings, revenue, results stay Company (fundamentals).
   if (/analyst|price target|\bpt\b|upgrade|downgrade|forecast|estimates?|ratings?|outlook|guidance|consensus|initiates?(?:d)? coverage|coverage (?:initiated|assumed)|overweight|underweight|equal weight|reiterat|target (?:raised|cut|hiked|lowered|upped)|Street (?:expects|sees)/.test(text)) return 'stock';
-  // Generic words (earnings, revenue, buy/sell/hold) only count as Stock when paired with an analyst context.
-  const hasGeneric = /earnings|\beps\b|revenue|results|\bbuy\b|\bsell\b|\bhold\b|beat|miss/.test(text);
-  const hasContext = /analyst|estimate|target|rating|consensus|forecast|outlook|guidance|earnings call|what analysts/.test(text);
-  if (hasGeneric && hasContext) return 'stock';
   if (/federal reserve|fed |interest rate|rate cut|rate hike|inflation|economy|economic|industry|sector|tariff|regulation|macro|market-wide|supply chain|semiconductor|chip|software|cloud|dow jones|s&p|nasdaq|wall street|market rally|market sell/.test(text)) return 'macro';
   return 'company';
 }
