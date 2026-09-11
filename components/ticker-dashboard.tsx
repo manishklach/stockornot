@@ -64,8 +64,8 @@ function barColor(value: number | null) {
 
 function classify(article: NewsItem): NewsBucket {
   if (article.sourceGroup === 'macro') return 'macro';
-  const text = `${article.title} ${article.reasoning ?? ''}`.toLowerCase();
-  if (/analyst|price target|upgrade|downgrade|forecast|estimate|rating|outlook|guidance|earnings call|price target raised|price target cut/.test(text)) return 'stock';
+  const text = `${article.title} ${article.reasoning ?? ''} ${article.summary ?? ''}`.toLowerCase();
+  if (/analyst|price target|\bpt\b|upgrade|downgrade|forecast|estimate|ratings?|outlook|guidance|earnings|eps\b|revenue|results|initiates?|coverage (?:initiated|assumed)|overweight|underweight|equal weight|buy\b|sell\b|hold\b|reiterat|target (?:raised|cut|hiked|lowered|upped)| Street (?:expects|sees)|consensus|what analysts|analysts expect/.test(text)) return 'stock';
   if (/federal reserve|fed |interest rate|rate cut|rate hike|inflation|economy|economic|industry|sector|tariff|regulation|macro|market-wide|supply chain|semiconductor|chip|software|cloud|dow jones|s&p|nasdaq|wall street|market rally|market sell/.test(text)) return 'macro';
   return 'company';
 }
@@ -141,8 +141,8 @@ function SignalMeter({ value }: { value: number | null }) {
   );
 }
 
-function SignalCard({ icon: Icon, title, score, count, positive, neutral, negative }: {
-  icon: typeof Building2; title: string; score: number | null; count: number; positive: number; neutral: number; negative: number;
+function SignalCard({ icon: Icon, title, score, count, positive, neutral, negative, emptyHint }: {
+  icon: typeof Building2; title: string; score: number | null; count: number; positive: number; neutral: number; negative: number; emptyHint?: string;
 }) {
   return (
     <article className="flex min-h-[168px] flex-col rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
@@ -158,6 +158,7 @@ function SignalCard({ icon: Icon, title, score, count, positive, neutral, negati
       <p className="mt-3 text-[11px] leading-4 text-[#8f9baa]">
         {count} {count === 1 ? 'item' : 'items'} · {positive} positive · {neutral} neutral · {negative} negative
       </p>
+      {count === 0 && emptyHint && <p className="mt-1.5 text-[10.5px] leading-4 text-[#5c6878]">{emptyHint}</p>}
     </article>
   );
 }
@@ -346,8 +347,8 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
           {/* 4 signal cards */}
           <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Market signals">
             <SignalCard icon={Building2} title="Company / Fundamental News" score={company.score} count={company.articles.length} positive={company.positive} neutral={company.neutral} negative={company.negative} />
-            <SignalCard icon={ChartLine} title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} />
-            <SignalCard icon={Factory} title="Industry / Macro News" score={macro.score} count={macro.articles.length} positive={macro.positive} neutral={macro.neutral} negative={macro.negative} />
+            <SignalCard icon={ChartLine} title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} emptyHint={stockNews.articles.length === 0 ? `No analyst or forecast items for ${stock.symbol} in ${windowLabel[signalWindow].toLowerCase()} — small caps often have thin coverage. Try 30 days.` : undefined} />
+            <SignalCard icon={Factory} title="Industry / Macro News" score={macro.score} count={macro.articles.length} positive={macro.positive} neutral={macro.neutral} negative={macro.negative} emptyHint={macro.articles.length === 0 ? 'No macro items in this window.' : undefined} />
             <article className="flex min-h-[168px] flex-col rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
