@@ -83,6 +83,13 @@ const bucketMeta: Record<NewsBucket, { short: string; title: string }> = {
 
 function bucketSignal(articles: NewsItem[], bucket: NewsBucket, signalWindow: SignalWindow, calculatedAt: number) {
   const selected = articles.filter((article) => classify(article) === bucket);
+  const positive = selected.filter((a) => a.sentiment === 'positive').length;
+  const neutral = selected.filter((a) => a.sentiment === 'neutral').length;
+  const negative = selected.filter((a) => a.sentiment === 'negative').length;
+  // Require 2+ items like the main news signal — a single article showing ±100 is misleading (e.g. SPCX company 1×negative = -100).
+  if (selected.length < 2) {
+    return { articles: selected, score: null, positive, neutral, negative };
+  }
   const halfLifeHours = Math.max(12, ({ '24h': 24, '7d': 168, '30d': 720 } as const)[signalWindow] / 3);
   let totalWeight = 0;
   let weightedScore = 0;
@@ -95,10 +102,10 @@ function bucketSignal(articles: NewsItem[], bucket: NewsBucket, signalWindow: Si
   }
   return {
     articles: selected,
-    score: selected.length && totalWeight ? (weightedScore / totalWeight) * 100 : null,
-    positive: selected.filter((a) => a.sentiment === 'positive').length,
-    neutral: selected.filter((a) => a.sentiment === 'neutral').length,
-    negative: selected.filter((a) => a.sentiment === 'negative').length,
+    score: totalWeight ? (weightedScore / totalWeight) * 100 : null,
+    positive,
+    neutral,
+    negative,
   };
 }
 
