@@ -4,6 +4,7 @@ import { CircleAlert } from 'lucide-react';
 import { TickerDashboard } from '@/components/ticker-dashboard';
 import type { SignalWindow } from '@/lib/intelligence';
 import { getTickerIntelligence } from '@/lib/intelligence.server';
+import { getBlendedCrowd } from '@/lib/crowd.server';
 import { getInstrument, getRandomInstrument } from '@/lib/instruments.server';
 
 type Props = {
@@ -59,9 +60,10 @@ export default async function TickerPage({ params, searchParams }: Props) {
   )
     ? (query.window as SignalWindow)
     : '7d';
-  const [intelligence, next] = await Promise.all([
+  const [intelligence, next, crowd] = await Promise.all([
     getTickerIntelligence(stock.symbol, signalWindow),
     getRandomInstrument(stock.symbol),
+    getBlendedCrowd(stock.symbol, signalWindow),
   ]);
 
   return (
@@ -70,6 +72,7 @@ export default async function TickerPage({ params, searchParams }: Props) {
       nextSymbol={next?.symbol ?? stock.symbol}
       intelligence={intelligence}
       signalWindow={signalWindow}
+      crowd={crowd}
     />
   );
 }

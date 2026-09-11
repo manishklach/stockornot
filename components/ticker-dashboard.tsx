@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Building2, ChartLine, Factory, Flame, Search, Shuffle, Snowflake, Users } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { NewsItem, SignalWindow, TickerIntelligence } from '@/lib/intelligence';
+import type { BlendedCrowd } from '@/lib/crowd';
 import type { Stock } from '@/lib/stocks';
 
 type SearchResult = Pick<Stock, 'symbol' | 'name' | 'type'>;
@@ -160,8 +161,8 @@ function SignalCard({ icon: Icon, title, score, count, positive, neutral, negati
   );
 }
 
-export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow }: {
-  stock: Stock; nextSymbol: string; intelligence: TickerIntelligence; signalWindow: SignalWindow;
+export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow, crowd }: {
+  stock: Stock; nextSymbol: string; intelligence: TickerIntelligence; signalWindow: SignalWindow; crowd?: BlendedCrowd | null;
 }) {
   const [hot, setHot] = useState(stock.hot);
   const [not, setNot] = useState(stock.not);
@@ -196,10 +197,17 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
   const stockNews = bucketSignal(intelligence.news.articles, 'stock', signalWindow, intelligence.news.calculatedAt);
   const macro = bucketSignal(intelligence.news.articles, 'macro', signalWindow, intelligence.news.calculatedAt);
   const totalVotes = hot + not;
-  const crowdScore = totalVotes ? ((hot - not) / totalVotes) * 100 : 0;
-  const hasVotes = totalVotes > 0;
+  const lifetimeCrowdScore = totalVotes ? ((hot - not) / totalVotes) * 100 : 0;
+  // Prefer windowed blended crowd (organic window votes + StockTwits) when available.
+  const crowdScore = crowd?.windowScore ?? lifetimeCrowdScore;
+  const crowdTotal = crowd ? crowd.windowTotal : totalVotes;
+  const hasVotes = crowd ? crowd.windowTotal >= 5 : totalVotes > 0;
+  const crowdConfidence = crowd?.confidence ?? (totalVotes >= 50 ? 'Established' : totalVotes >= 10 ? 'Developing' : 'Limited');
+  const seedTotal = crowd ? crowd.breakdown.seedHot + crowd.breakdown.seedNot : 0;
+  const organicTotal = crowd ? crowd.breakdown.organicHot + crowd.breakdown.organicNot : 0;
+  const external = crowd?.external ?? null;
   const newsScore = intelligence.news.score;
-  const divergence = newsScore === null ? null : crowdScore - newsScore;
+  const divergence = newsScore === null || crowdScore === null ? null : crowdScore - newsScore;
   const divergenceCopy = divergence === null
     ? 'More ticker-specific reporting is needed before the signals can be compared.'
     : Math.abs(divergence) < 15
@@ -339,22 +347,30 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
             <SignalCard icon={ChartLine} title="Stock / Forecast News" score={stockNews.score} count={stockNews.articles.length} positive={stockNews.positive} neutral={stockNews.neutral} negative={stockNews.negative} />
             <SignalCard icon={Factory} title="Industry / Macro News" score={macro.score} count={macro.articles.length} positive={macro.positive} neutral={macro.neutral} negative={macro.negative} />
             <article className="flex min-h-[168px] flex-col rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]">
-              <div className="flex items-center gap-2">
-                <Users className="size-3.5 text-[#7d8da1]" />
-                <p className="text-[12.5px] font-semibold text-[#d7dde6]">Crowd Sentiment</p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Users className="size-3.5 text-[#7d8da1]" />
+                  <p className="text-[12.5px] font-semibold text-[#d7dde6]">Crowd Sentiment</p>
+                </div>
+                <span className="rounded-full bg-[#172131] px-2 py-0.5 text-[10px] font-bold text-[#8f9baa]">{crowdConfidence}</span>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
                 <strong className={`font-mono text-[36px] font-black leading-none tracking-[-0.05em] ${tone(hasVotes ? crowdScore : null)}`}>
                   {hasVotes ? signed(crowdScore) : '—'}
                 </strong>
-                <span className={`pb-0.5 text-[12px] font-medium ${tone(hasVotes ? crowdScore : null)}`}>{hasVotes ? label(crowdScore) : 'No votes'}</span>
+                <span className={`pb-0.5 text-[12px] font-medium ${tone(hasVotes ? crowdScore : null)}`}>{hasVotes ? label(crowdScore) : 'Low sample'}</span>
               </div>
               <SignalMeter value={hasVotes ? crowdScore : null} />
               <div className="mt-3 flex items-center justify-between gap-2">
                 <p className="text-[11px] text-[#8f9baa]">
-                  {totalVotes.toLocaleString()} responses · {hot.toLocaleString()} hot · {not.toLocaleString()} not
+                  {crowdTotal.toLocaleString()} window signals · {windowLabel[signalWindow].toLowerCase()}
                 </p>
               </div>
+              <p className="mt-1 text-[10.5px] leading-4 text-[#5c6878]">
+                {crowd
+                  ? `${organicTotal.toLocaleString()} organic votes (${crowd.breakdown.organicWindowHot + (external?.bull ?? 0)} hot / ${crowd.breakdown.organicWindowNot + (external?.bear ?? 0)} not in window)${external ? ` + ${external.messageCount} StockTwits msgs${external.stale ? ' (stale)' : ''}` : ''} · ${seedTotal.toLocaleString()} seed baseline excluded`
+                  : `${totalVotes.toLocaleString()} responses · ${hot.toLocaleString()} hot · ${not.toLocaleString()} not`}
+              </p>
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={() => vote('hot')} disabled={voteState === 'saving'}
@@ -390,7 +406,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
                 <div className="rounded-[9px] bg-[#172131] px-4 py-3">
                   <p className="text-[11px] text-[#8f9baa]">Crowd</p>
                   <strong className={`mt-1 block font-mono text-[20px] font-bold ${tone(hasVotes ? crowdScore : null)}`}>{hasVotes ? signed(crowdScore) : '—'}</strong>
-                  <p className="mt-1 text-[10.5px] text-[#7d8a9a]">{totalVotes.toLocaleString()} votes</p>
+                  <p className="mt-1 text-[10.5px] text-[#7d8a9a]">{crowdTotal.toLocaleString()} window signals · {crowdConfidence}</p>
                 </div>
               </div>
             </article>
@@ -406,7 +422,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow 
                 <div className="rounded-[10px] border border-[#2b3646] bg-[#0d1626] p-4">
                   <strong className="font-mono text-[13px] font-black tracking-wider text-[#d4a9ff]">CROWD</strong>
                   <p className="mt-1.5 text-[11.5px] leading-4 text-[#aeb9c7]">Investor psychology and public discussion</p>
-                  <p className="mt-2 text-[10.5px] leading-4 text-[#7d8a9a]">Hot / Not votes. Never feeds back into News.</p>
+                  <p className="mt-2 text-[10.5px] leading-4 text-[#7d8a9a]">Own Hot/Not (windowed, seed excluded) + StockTwits bull/bear. Never feeds into News.</p>
                 </div>
               </div>
               <p className="mt-4 text-[11.5px] leading-4 text-[#8f9baa]">No item can exist in both groups. News tiers apply only to News.</p>
