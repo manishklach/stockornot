@@ -69,13 +69,55 @@ export async function getInstrument(symbol: string) {
   return row ? fromRow(row) : undefined;
 }
 
-export async function getRandomInstrument(excludeSymbol?: string) {
+export type RandomMode = 'featured' | 'all';
+
+async function pickRandomSymbol(excludeUpper: string, tiers?: string[]) {
+  const tierFilter = tiers?.length
+    ? `AND coverage_tier IN (${tiers.map(() => '?').join(', ')})`
+    : '';
+  const params = tiers?.length ? [excludeUpper, ...tiers] : [excludeUpper];
   const row = await env.DB.prepare(
-    'SELECT symbol FROM instruments WHERE active = 1 AND symbol != ? ORDER BY RANDOM() LIMIT 1',
+    `SELECT symbol FROM instruments WHERE active = 1 AND symbol != ? ${tierFilter} ORDER BY RANDOM() LIMIT 1`,
   )
-    .bind(excludeSymbol?.toUpperCase() ?? '')
+    .bind(...params)
     .first<{ symbol: string }>();
-  return row ? getInstrument(row.symbol) : undefined;
+  return row?.symbol;
+}
+
+export async function getRandomInstrument(excludeSymbol?: string, mode: RandomMode = 'featured') {
+  const excludeUpper = excludeSymbol?.toUpperCase() ?? '';
+  if (mode === 'all') {
+    const row = await env.DB.prepare(
+      'SELECT symbol FROM instruments WHERE active = 1 AND symbol != ? ORDER BY RANDOM() LIMIT 1',
+    )
+      .bind(excludeUpper)
+      .first<{ symbol: string }>();
+    return row ? getInstrument(row.symbol) : undefined;
+  }
+  // Prefer sufficiently populated tickers so random discovery lands on real signal.
+  // Falls back gracefully when the coverage migration hasn't run yet.
+  try {
+    let symbol =
+      (await pickRandomSymbol(excludeUpper, ['established', 'developing'])) ??
+      (await pickRandomSymbol(excludeUpper, ['limited', 'unclassified'])) ??
+      (await pickRandomSymbol(excludeUpper));
+    if (!symbol) {
+      const row = await env.DB.prepare(
+        'SELECT symbol FROM instruments WHERE active = 1 AND symbol != ? ORDER BY RANDOM() LIMIT 1',
+      )
+        .bind(excludeUpper)
+        .first<{ symbol: string }>();
+      symbol = row?.symbol;
+    }
+    return symbol ? getInstrument(symbol) : undefined;
+  } catch {
+    const row = await env.DB.prepare(
+      'SELECT symbol FROM instruments WHERE active = 1 AND symbol != ? ORDER BY RANDOM() LIMIT 1',
+    )
+      .bind(excludeUpper)
+      .first<{ symbol: string }>();
+    return row ? getInstrument(row.symbol) : undefined;
+  }
 }
 
 export async function searchInstruments(query: string, limit = 8) {

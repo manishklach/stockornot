@@ -57,6 +57,12 @@ export const instruments = sqliteTable(
     seedNot: integer('seed_not').notNull(),
     sourceUpdatedAt: text('source_updated_at'),
     syncedAt: integer('synced_at').notNull(),
+    coverageTier: text('coverage_tier', {
+      enum: ['established', 'developing', 'limited', 'thin', 'unclassified'],
+    })
+      .notNull()
+      .default('unclassified'),
+    coverageUpdatedAt: integer('coverage_updated_at'),
   },
   (table) => [
     index('idx_instruments_active_type_symbol').on(
@@ -65,6 +71,7 @@ export const instruments = sqliteTable(
       table.symbol,
     ),
     index('idx_instruments_name').on(table.name),
+    index('idx_instruments_coverage').on(table.active, table.coverageTier),
   ],
 );
 

@@ -36,6 +36,29 @@ type MassiveArticle = {
 
 const PROFILE_TTL = 7 * 24 * 60 * 60 * 1000;
 const NEWS_TTL = 30 * 60 * 1000;
+// Bump to ignore pre-existing empty/greenfield caches written before fallback
+// sources (Google News, GDELT) existed. Old unversioned rows are orphaned.
+const CACHE_VERSION = 2;
+
+function profileKind() {
+  return `profile:v${CACHE_VERSION}`;
+}
+
+function newsKind(window: SignalWindow) {
+  return `news:v${CACHE_VERSION}:${window}`;
+}
+
+function macroKind(window: SignalWindow) {
+  return `macro:v${CACHE_VERSION}:${window}`;
+}
+
+function proxyKind(window: SignalWindow) {
+  return `proxy:v${CACHE_VERSION}:${window}`;
+}
+
+function isEmptyNews(value: NewsSignal | null | undefined) {
+  return !value || value.total === 0;
+}
 const WINDOW_HOURS: Record<SignalWindow, number> = {
   '24h': 24,
   '7d': 7 * 24,
@@ -104,8 +127,17 @@ function safeExternalUrl(value?: string) {
   }
 }
 
-async function getProfile(symbol: string) {
-  const cached = await readCache<TickerProfile>(symbol, 'profile');
+async function getProfile(symbol: string, assetType: 'Stock' | 'ETF' = 'Stock') {
+  const kind = profileKind();
+  const cached = await readCache<TickerProfile>(symbol, kind);
+  // Migrate legacy unversioned profile rows once so ETFs don't stick with stock-shaped empties.
+  if (!cached) {
+    const legacy = await readCache<TickerProfile>(symbol, 'profile');
+    if (legacy && !isEmptyProfile(legacy.value)) {
+      await writeCache(symbol, kind, legacy.value);
+      return { value: legacy.value, stale: false };
+    }
+  }
   if (cached && Date.now() - cached.fetchedAt < PROFILE_TTL)
     return { value: cached.value, stale: false };
   try {
@@ -113,21 +145,49 @@ async function getProfile(symbol: string) {
       `https://api.massive.com/v3/reference/tickers/${encodeURIComponent(symbol)}`,
     );
     if (!body.results) throw new Error('No profile returned.');
-    const profile: TickerProfile = {
+    const base = {
       description: body.results.description ?? null,
-      industry: body.results.sic_description ?? null,
-      marketCap: body.results.market_cap ?? null,
-      employees: body.results.total_employees ?? null,
       exchange: body.results.primary_exchange ?? null,
       currency: body.results.currency_name?.toUpperCase() ?? null,
       homepageUrl: safeExternalUrl(body.results.homepage_url),
       listDate: body.results.list_date ?? null,
     };
-    await writeCache(symbol, 'profile', profile);
+    const profile: TickerProfile =
+      assetType === 'ETF'
+        ? {
+            kind: 'etf',
+            assetType: 'ETF',
+            description: base.description,
+            industry: null,
+            marketCap: null,
+            employees: null,
+            exchange: base.exchange,
+            currency: base.currency,
+            homepageUrl: base.homepageUrl,
+            listDate: base.listDate,
+          }
+        : {
+            kind: 'stock',
+            assetType: 'Stock',
+            description: base.description,
+            industry: body.results.sic_description ?? null,
+            marketCap: body.results.market_cap ?? null,
+            employees: body.results.total_employees ?? null,
+            exchange: base.exchange,
+            currency: base.currency,
+            homepageUrl: base.homepageUrl,
+            listDate: base.listDate,
+          };
+    await writeCache(symbol, kind, profile);
     return { value: profile, stale: false };
   } catch {
     return { value: cached?.value ?? null, stale: Boolean(cached) };
   }
+}
+
+function isEmptyProfile(value: TickerProfile | null | undefined) {
+  if (!value) return true;
+  return !value.description && !value.exchange && !value.homepageUrl && !value.listDate;
 }
 
 function emptySignal(): NewsSignal {
@@ -236,9 +296,11 @@ function calculateNewsSignal(
 }
 
 async function getNews(symbol: string, window: SignalWindow) {
-  const kind = `news:${window}`;
+  const kind = newsKind(window);
   const cached = await readCache<NewsSignal>(symbol, kind);
-  if (cached && Date.now() - cached.fetchedAt < NEWS_TTL)
+  // Empty cached signals are treated as a miss so Google News / GDELT fallbacks run.
+  // This invalidates old 30-minute empty caches without a manual D1 wipe.
+  if (cached && Date.now() - cached.fetchedAt < NEWS_TTL && !isEmptyNews(cached.value))
     return { value: cached.value, stale: false };
   try {
     const start = new Date(Date.now() - WINDOW_HOURS[window] * 3_600_000).toISOString();
@@ -284,7 +346,7 @@ function cleanIndustryQuery(industry: string | null): string | null {
 
 async function fetchMarketProxy(symbol: string, window: SignalWindow): Promise<NewsItem[]> {
   // Shared across tickers: one D1 row warms SPY/QQQ for every dashboard, avoiding per-ticker Massive fan-out.
-  const shared = await readCache<NewsItem[]>('__MARKET__', `proxy:${window}`);
+  const shared = await readCache<NewsItem[]>(`__MARKET__`, proxyKind(window));
   if (shared && Date.now() - shared.fetchedAt < MACRO_TTL && shared.value.length > 0)
     return shared.value;
   const start = new Date(Date.now() - WINDOW_HOURS[window] * 3_600_000).toISOString();
@@ -322,7 +384,7 @@ async function fetchMarketProxy(symbol: string, window: SignalWindow): Promise<N
     }
     if (items.length >= 8) break;
   }
-  if (items.length > 0) await writeCache('__MARKET__', `proxy:${window}`, items);
+  if (items.length > 0) await writeCache('__MARKET__', proxyKind(window), items);
   void symbol;
   return items;
 }
@@ -481,9 +543,10 @@ async function fetchGoogleNewsMacro(window: SignalWindow): Promise<NewsItem[]> {
 }
 
 async function getMacroExtras(symbol: string, industry: string | null, window: SignalWindow) {
-  const kind = `macro:${window}`;
+  const kind = macroKind(window);
   const cached = await readCache<NewsItem[]>(symbol, kind);
-  if (cached && Date.now() - cached.fetchedAt < MACRO_TTL)
+  // Ignore old empty macro rows so fallbacks rerun instead of serving 30m of nothing.
+  if (cached && Date.now() - cached.fetchedAt < MACRO_TTL && cached.value.length > 0)
     return { value: cached.value, stale: false };
   try {
     const [proxy, gdeltIndustry, gdeltCompany, gnews, gnewsMacro] = await Promise.all([
@@ -516,16 +579,55 @@ async function getMacroExtras(symbol: string, industry: string | null, window: S
   }
 }
 
+async function getAssetType(symbol: string): Promise<'Stock' | 'ETF'> {
+  try {
+    const row = await env.DB.prepare('SELECT asset_type FROM instruments WHERE symbol = ?')
+      .bind(symbol)
+      .first<{ asset_type: string }>();
+    return row?.asset_type === 'ETF' ? 'ETF' : 'Stock';
+  } catch {
+    return 'Stock';
+  }
+}
+
+export type CoverageTier = 'established' | 'developing' | 'limited' | 'thin' | 'unclassified';
+
+export function coverageTierFor(total: number, extras: number): CoverageTier {
+  const combined = total + extras;
+  if (total >= 8 || combined >= 10) return 'established';
+  if (total >= 3 || combined >= 5) return 'developing';
+  if (total >= 1 || combined >= 1) return 'limited';
+  return 'thin';
+}
+
+async function recordCoverage(symbol: string, tier: CoverageTier) {
+  try {
+    await env.DB.prepare(
+      `UPDATE instruments SET coverage_tier = ?, coverage_updated_at = ? WHERE symbol = ?`,
+    )
+      .bind(tier, Date.now(), symbol)
+      .run();
+  } catch {
+    // Column may not exist until migration 0004 lands in an environment — best effort.
+  }
+}
+
 export async function getTickerIntelligence(
   symbol: string,
   window: SignalWindow,
+  assetType?: 'Stock' | 'ETF',
 ): Promise<TickerIntelligence> {
   const normalized = symbol.toUpperCase();
-  const profile = await getProfile(normalized);
+  const resolvedType = assetType ?? (await getAssetType(normalized));
+  const profile = await getProfile(normalized, resolvedType);
+  const industry = profile.value?.kind === 'stock' ? (profile.value.industry ?? null) : null;
   const [news, macro] = await Promise.all([
     getNews(normalized, window),
-    getMacroExtras(normalized, profile.value?.industry ?? null, window),
+    getMacroExtras(normalized, industry, window),
   ]);
+  const tier = coverageTierFor(news.value.total, macro.value.length);
+  // Best-effort persistent marking so random discovery can prefer populated tickers.
+  void recordCoverage(normalized, tier);
   return {
     profile: profile.value,
     news: news.value,

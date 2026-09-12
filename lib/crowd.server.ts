@@ -54,7 +54,7 @@ async function readExternalCache(symbol: string, window: SignalWindow) {
   try {
     const row = await env.DB.prepare(
       'SELECT payload, fetched_at FROM intelligence_cache WHERE symbol = ? AND kind = ?',
-    ).bind(symbol.toUpperCase(), `crowd:st:${window}`).first<{ payload: string; fetched_at: number }>();
+    ).bind(symbol.toUpperCase(), `crowd:st:v2:${window}`).first<{ payload: string; fetched_at: number }>();
     if (!row) return null;
     return { value: JSON.parse(row.payload) as Omit<ExternalSentiment, 'stale'>, fetchedAt: row.fetched_at };
   } catch {
@@ -67,7 +67,7 @@ async function writeExternalCache(symbol: string, window: SignalWindow, value: u
     await env.DB.prepare(
       `INSERT INTO intelligence_cache (symbol, kind, payload, fetched_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(symbol, kind) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at`,
-    ).bind(symbol.toUpperCase(), `crowd:st:${window}`, JSON.stringify(value), Date.now()).run();
+    ).bind(symbol.toUpperCase(), `crowd:st:v2:${window}`, JSON.stringify(value), Date.now()).run();
   } catch {
     /* cache is best-effort */
   }

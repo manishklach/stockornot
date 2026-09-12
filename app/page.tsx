@@ -1,8 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getRandomInstrument } from '@/lib/instruments.server';
 
-export default async function Home() {
-  const instrument = await getRandomInstrument();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<{ all?: string }>;
+}) {
+  const all = (await searchParams)?.all === '1';
+  const instrument = await getRandomInstrument(undefined, all ? 'all' : 'featured');
   if (!instrument)
     return (
       <main className="grid min-h-screen place-items-center bg-background px-6 text-center text-foreground">

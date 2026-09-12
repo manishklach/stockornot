@@ -9,7 +9,7 @@ import { getInstrument, getRandomInstrument } from '@/lib/instruments.server';
 
 type Props = {
   params: Promise<{ symbol: string }>;
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ window?: string; all?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -60,9 +60,10 @@ export default async function TickerPage({ params, searchParams }: Props) {
   )
     ? (query.window as SignalWindow)
     : '7d';
+  const randomMode = query.all === '1' ? 'all' : 'featured';
   const [intelligence, next, crowd] = await Promise.all([
-    getTickerIntelligence(stock.symbol, signalWindow),
-    getRandomInstrument(stock.symbol),
+    getTickerIntelligence(stock.symbol, signalWindow, stock.type),
+    getRandomInstrument(stock.symbol, randomMode),
     getBlendedCrowd(stock.symbol, signalWindow),
   ]);
 
@@ -73,6 +74,7 @@ export default async function TickerPage({ params, searchParams }: Props) {
       intelligence={intelligence}
       signalWindow={signalWindow}
       crowd={crowd}
+      randomMode={randomMode}
     />
   );
 }

@@ -179,8 +179,8 @@ function SignalCard({ icon: Icon, title, score, count, positive, neutral, negati
   );
 }
 
-export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow, crowd }: {
-  stock: Stock; nextSymbol: string; intelligence: TickerIntelligence; signalWindow: SignalWindow; crowd?: BlendedCrowd | null;
+export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow, crowd, randomMode }: {
+  stock: Stock; nextSymbol: string; intelligence: TickerIntelligence; signalWindow: SignalWindow; crowd?: BlendedCrowd | null; randomMode?: 'featured' | 'all';
 }) {
   const [hot, setHot] = useState(stock.hot);
   const [not, setNot] = useState(stock.not);
@@ -246,8 +246,14 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
     }
   }
 
+  const isAllMode = randomMode === 'all';
+  const randomHref = isAllMode
+    ? `/ticker/${nextSymbol.toLowerCase()}?window=${signalWindow}&all=1`
+    : `/ticker/${nextSymbol.toLowerCase()}?window=${signalWindow}`;
+
   function changeWindow(next: string) {
-    window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?window=${next}`);
+    const suffix = isAllMode ? `&all=1` : '';
+    window.location.assign(`/ticker/${stock.symbol.toLowerCase()}?window=${next}${suffix}`);
   }
 
   async function vote(rating: 'hot' | 'not') {
@@ -337,10 +343,17 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
                 <option value="30d">30 days</option>
               </select>
               <a
-                href={`/ticker/${nextSymbol.toLowerCase()}`} aria-label="Open a random ticker" title="Random ticker"
+                href={randomHref} aria-label="Open a random ticker" title={isAllMode ? 'Random ticker (all tickers)' : 'Random ticker (featured)'}
                 className="grid h-9 w-10 place-items-center rounded-[8px] border border-[#2a3545] bg-[#0e1724] text-[#dce2eb] hover:bg-[#182232] hover:text-white"
               >
                 <Shuffle className="size-3.5" />
+              </a>
+              <a
+                href={isAllMode ? `/ticker/${stock.symbol.toLowerCase()}?window=${signalWindow}` : `/ticker/${stock.symbol.toLowerCase()}?window=${signalWindow}&all=1`}
+                title={isAllMode ? 'Random now draws from all tickers' : 'Random now prefers populated tickers'}
+                className="grid h-9 place-items-center rounded-[8px] border border-[#2a3545] bg-[#0e1724] px-2.5 text-[11px] font-bold text-[#aeb9c7] hover:bg-[#182232] hover:text-white"
+              >
+                {isAllMode ? 'ALL' : 'FEATURED'}
               </a>
             </div>
           </header>
@@ -350,7 +363,11 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
             <div>
               <h2 className="text-[21px] font-bold tracking-[-0.02em]">{stock.name} ({stock.symbol})</h2>
               <p className="mt-1 text-[13px] text-[#9aa6b6]">
-                {stock.type} · {profile?.industry ?? stock.sector} · {windowLabel[signalWindow]}
+                {stock.type}
+                {profile?.kind === 'stock' && profile.industry ? ` · ${profile.industry}` : ''}
+                {profile?.kind === 'etf' ? ' · Fund' : ''}
+                {(!profile || (profile.kind === 'stock' && !profile.industry)) && stock.type === 'Stock' ? ` · ${stock.sector}` : ''}
+                {' · '}{windowLabel[signalWindow]}
                 {profile?.exchange ? ` · ${profile.exchange}` : ''}
               </p>
             </div>
@@ -457,34 +474,57 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
             </article>
           </section>
 
-          {/* Company profile details */}
-          <section className="mt-3 rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 sm:p-6" aria-label="Company profile">
+          {/* Profile details — separate Stock vs ETF schemas */}
+          <section className="mt-3 rounded-[12px] border border-[#232f42] bg-[#101a2a]/95 p-5 sm:p-6" aria-label={profile?.kind === 'etf' ? 'Fund profile' : 'Company profile'}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[13px] font-bold text-white">Company Profile</h2>
+              <h2 className="text-[13px] font-bold text-white">{profile?.kind === 'etf' ? 'Fund Profile' : 'Company Profile'}</h2>
               {profile?.homepageUrl && (
                 <a href={profile.homepageUrl} target="_blank" rel="noreferrer" className="text-[11.5px] font-semibold text-[#8fb0ff] hover:underline">
                   Official site ↗
                 </a>
               )}
             </div>
-            {profile?.description
-              ? <p className="mt-3 max-w-[110ch] text-[13px] leading-5 text-[#b9c2cf]">{profile.description}</p>
-              : <p className="mt-3 text-[13px] text-[#7d8a9a]">No company description available for {stock.symbol}.</p>}
-            <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-              {[
-                { k: 'Market cap', v: formatMarketCap(profile?.marketCap ?? null) },
-                { k: 'Employees', v: profile?.employees ? profile.employees.toLocaleString() : '—' },
-                { k: 'Exchange', v: profile?.exchange ?? stock.sector ?? '—' },
-                { k: 'Currency', v: profile?.currency ?? '—' },
-                { k: 'Listed', v: profile?.listDate ?? '—' },
-                { k: 'Type', v: stock.type },
-              ].map((f) => (
-                <div key={f.k} className="rounded-[9px] bg-[#172131] px-3.5 py-2.5">
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-[#7d8a9a]">{f.k}</dt>
-                  <dd className="mt-1 truncate font-mono text-[13px] font-bold text-white" title={f.v}>{f.v}</dd>
-                </div>
-              ))}
-            </dl>
+            {profile?.kind === 'etf' ? (
+              <>
+                {profile.description
+                  ? <p className="mt-3 max-w-[110ch] text-[13px] leading-5 text-[#b9c2cf]">{profile.description}</p>
+                  : <p className="mt-3 text-[13px] leading-5 text-[#7d8a9a]">{stock.symbol} is an exchange-traded fund. Issuers rarely publish company-style descriptions, industry, market cap, or headcount, so only fund-level context is shown. News for ETFs is typically fund-flow and index-level rather than single-company reporting.</p>}
+                <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                  {[
+                    { k: 'Exchange', v: profile.exchange ?? stock.sector ?? '—' },
+                    { k: 'Currency', v: profile.currency ?? '—' },
+                    { k: 'Listed', v: profile.listDate ?? '—' },
+                    { k: 'Type', v: stock.type },
+                  ].map((f) => (
+                    <div key={f.k} className="rounded-[9px] bg-[#172131] px-3.5 py-2.5">
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-[#7d8a9a]">{f.k}</dt>
+                      <dd className="mt-1 truncate font-mono text-[13px] font-bold text-white" title={f.v}>{f.v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            ) : (
+              <>
+                {profile?.description
+                  ? <p className="mt-3 max-w-[110ch] text-[13px] leading-5 text-[#b9c2cf]">{profile.description}</p>
+                  : <p className="mt-3 text-[13px] text-[#7d8a9a]">No company description available for {stock.symbol}.</p>}
+                <dl className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                  {[
+                    { k: 'Market cap', v: formatMarketCap(profile?.kind === 'stock' ? (profile.marketCap ?? null) : null) },
+                    { k: 'Employees', v: profile?.kind === 'stock' && profile.employees ? profile.employees.toLocaleString() : '—' },
+                    { k: 'Exchange', v: profile?.exchange ?? stock.sector ?? '—' },
+                    { k: 'Currency', v: profile?.currency ?? '—' },
+                    { k: 'Listed', v: profile?.listDate ?? '—' },
+                    { k: 'Type', v: stock.type },
+                  ].map((f) => (
+                    <div key={f.k} className="rounded-[9px] bg-[#172131] px-3.5 py-2.5">
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-[#7d8a9a]">{f.k}</dt>
+                      <dd className="mt-1 truncate font-mono text-[13px] font-bold text-white" title={f.v}>{f.v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            )}
           </section>
 
           {/* Recent information */}
@@ -551,7 +591,7 @@ export function TickerDashboard({ stock, nextSymbol, intelligence, signalWindow,
             <div className="flex gap-4">
               <a href="/methodology" className="font-semibold text-[#7d8da1] hover:text-white hover:underline">Methodology</a>
               <a href="/leaderboard" className="font-semibold text-[#7d8da1] hover:text-white hover:underline">Leaderboard</a>
-              <a href={`/ticker/${nextSymbol.toLowerCase()}`} className="font-semibold text-[#7d8da1] hover:text-white hover:underline">Random ticker</a>
+              <a href={randomHref} className="font-semibold text-[#7d8da1] hover:text-white hover:underline">Random ticker{isAllMode ? ' (all)' : ''}</a>
             </div>
           </footer>
         </div>
